@@ -7,7 +7,6 @@
 	import DesktopLayout from './(components)/layout/DesktopLayout.svelte';
 	import MobileLayout from './(components)/layout/MobileLayout.svelte';
 	import UpdateDataLossDialog from './(components)/layout/UpdateDataLossDialog.svelte';
-	import TermsOfServiceDialog from '$lib/components/TermsOfServiceDialog.svelte';
 
 	import { overrideItemIdKeyNameBeforeInitialisingDndZones } from 'svelte-dnd-action';
 	overrideItemIdKeyNameBeforeInitialisingDndZones('name');
@@ -33,7 +32,6 @@
 <Toaster />
 
 <UpdateDataLossDialog />
-<TermsOfServiceDialog />
 
 {#if isMobile === true}
 	<MobileLayout>{@render children()}</MobileLayout>

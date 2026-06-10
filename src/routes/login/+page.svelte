@@ -8,7 +8,7 @@
 </script>
 
 <div class="flex h-full flex-col items-center justify-center gap-6 p-4">
-	<h1 class="text-2xl font-bold">MyFit</h1>
+	<h1 class="text-2xl font-bold">Dead Lifts</h1>
 	<form
 		method="POST"
 		class="flex w-full max-w-xs flex-col gap-3"
