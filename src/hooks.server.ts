@@ -5,9 +5,14 @@ import { createContext } from '$lib/trpc/context';
 import { router } from '$lib/trpc/router';
 import { createTRPCHandle } from 'trpc-sveltekit';
 import { sequence } from '@sveltejs/kit/hooks';
+import type { Handle } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
+import { verifyAccessJwt } from '$lib/server/cfAccess';
+import { mintSession } from '$lib/server/singleUserSession';
 
 // Self-hosted single-user build: no OAuth providers. Sessions are still
-// resolved through the Prisma adapter; rows are minted by /login.
+// resolved through the Prisma adapter; rows are minted by /login or the
+// Cloudflare Access handle below.
 const { handle: authHandle } = SvelteKitAuth({
 	adapter: PrismaAdapter(prisma),
 	basePath: '/auth',
@@ -21,6 +26,32 @@ const { handle: authHandle } = SvelteKitAuth({
 	}
 });
 
+// SSO via Cloudflare Access: requests arriving through the proxied domain
+// carry a team-signed JWT. If there's no app session yet, verify it, mint a
+// session row + cookie, and answer locals.auth() directly for this request.
+const cfAccessHandle: Handle = async ({ event, resolve }) => {
+	const existing = await event.locals.auth();
+	if (!existing) {
+		const jwt = event.request.headers.get('cf-access-jwt-assertion');
+		if (jwt) {
+			const payload = await verifyAccessJwt(jwt);
+			const email = payload?.email as string | undefined;
+			const ownerEmail = env.APP_USER_EMAIL ?? 'owner@selfhosted.local';
+			if (email && email === ownerEmail) {
+				const secure = event.url.protocol === 'https:';
+				const { user, expires } = await mintSession(event.cookies, secure);
+				const session = {
+					user: { id: user.id, name: user.name, email: user.email, image: user.image },
+					userId: user.id,
+					expires: expires.toISOString()
+				};
+				event.locals.auth = async () => session;
+			}
+		}
+	}
+	return resolve(event);
+};
+
 const trpcHandle = createTRPCHandle({
 	router,
 	createContext,
@@ -28,4 +59,4 @@ const trpcHandle = createTRPCHandle({
 		console.error(`Encountered error while trying to process ${type} @ ${path}:`, error)
 });
 
-export const handle = sequence(authHandle, trpcHandle);
+export const handle = sequence(authHandle, cfAccessHandle, trpcHandle);
