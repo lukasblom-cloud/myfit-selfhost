@@ -60,7 +60,7 @@
 	</Card.Root>
 {/if}
 
-{#if !dismissDomainMove}
+{#if false}
 	<Card.Root class="mt-2">
 		<Card.Header>
 			<Card.Title class="text-primary">🚀 MyFit has moved to a new domain!</Card.Title>

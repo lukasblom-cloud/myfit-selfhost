@@ -19,14 +19,14 @@ export default defineConfig({
 			base: '/',
 			manifest: {
 				id: '/?app=v3',
-				name: 'MyFit v3',
-				short_name: 'MyFit',
+				name: 'Dead Lifts',
+				short_name: 'Dead Lifts',
 				start_url: '/',
 				display: 'standalone',
 				background_color: '#0a0a0a',
 				theme_color: '#3079ca',
 				orientation: 'portrait',
-				description: "A fitness app with all the logging and tracking options you'll ever need",
+				description: "Self-hosted RP-style hypertrophy tracker",
 				icons: [
 					{
 						src: 'maskable_icon_x192.png',
