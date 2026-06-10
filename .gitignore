@@ -22,3 +22,6 @@ src/lib/generated/prisma
 .turbo
 todo.md
 .playwright-cli
+# Local Netlify folder
+.netlify
+.netlify-site-id

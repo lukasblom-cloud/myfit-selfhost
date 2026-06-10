@@ -1,0 +1,11 @@
+# Self-hosted MyFit — SvelteKit SSR on Netlify Functions.
+[build]
+  command = "npx prisma generate && npm run build"
+  publish = "build"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  # Prisma query engine binary must ship with the SSR function bundle.
+  included_files = ["node_modules/.prisma/client/libquery_engine-rhel-openssl-3.0.x.so.node", "node_modules/.prisma/client/schema.prisma"]
