@@ -8,7 +8,24 @@ import { sequence } from '@sveltejs/kit/hooks';
 import type { Handle } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { verifyAccessJwt } from '$lib/server/cfAccess';
-import { mintSession } from '$lib/server/singleUserSession';
+import { getOrCreateUser, mintSessionForUser } from '$lib/server/singleUserSession';
+
+// Who is allowed in via Cloudflare Access. Cloudflare's own Access policy is
+// the primary gate; this is a second app-level gate so membership can also be
+// controlled from the app env. Comma-separated emails, or `*` to trust
+// whatever Access verified. Falls back to owner-only if unset (back-compat).
+function allowedAccessEmails(): string[] {
+	const list = env.CF_ACCESS_ALLOWED_EMAILS ?? env.APP_USER_EMAIL ?? 'owner@selfhosted.local';
+	return list
+		.split(',')
+		.map((e) => e.trim().toLowerCase())
+		.filter(Boolean);
+}
+
+function isAccessEmailAllowed(email: string): boolean {
+	const allow = allowedAccessEmails();
+	return allow.includes('*') || allow.includes(email.toLowerCase());
+}
 
 // Self-hosted single-user build: no OAuth providers. Sessions are still
 // resolved through the Prisma adapter; rows are minted by /login or the
@@ -36,10 +53,11 @@ const cfAccessHandle: Handle = async ({ event, resolve }) => {
 		if (jwt) {
 			const payload = await verifyAccessJwt(jwt);
 			const email = payload?.email as string | undefined;
-			const ownerEmail = env.APP_USER_EMAIL ?? 'owner@selfhosted.local';
-			if (email && email === ownerEmail) {
+			if (email && isAccessEmailAllowed(email)) {
 				const secure = event.url.protocol === 'https:';
-				const { user, expires } = await mintSession(event.cookies, secure);
+				const name = (payload?.name ?? payload?.given_name) as string | undefined;
+				const user = await getOrCreateUser(email, name);
+				const { expires } = await mintSessionForUser(user, event.cookies, secure);
 				const session = {
 					user: { id: user.id, name: user.name, email: user.email, image: user.image },
 					userId: user.id,
