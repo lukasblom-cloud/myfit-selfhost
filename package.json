@@ -33,7 +33,7 @@
 		"@typescript-eslint/parser": "^8.0.0",
 		"@vite-pwa/sveltekit": "^1.1.0",
 		"autoprefixer": "^10.4.19",
-		"bits-ui": "^0.22.0",
+		"bits-ui": "^1.8.0",
 		"cmdk-sv": "^0.0.18",
 		"dotenv": "^16.4.5",
 		"embla-carousel-svelte": "^8.5.1",
