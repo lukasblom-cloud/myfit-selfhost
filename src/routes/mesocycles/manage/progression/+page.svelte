@@ -134,7 +134,9 @@
 						ariaLabel="mesocycle-last-set-to-failure-info"
 						triggerClasses="absolute -right-0.5 -top-2.5 focus:outline-none"
 					>
-						Take the last set of each exercise to 0 RIR
+						Takes the last set of every exercise to 0 RIR — in <em>every</em> week of the
+						mesocycle, not just the last one. With this on, a week targeting 3 RIR still ends
+						every exercise at failure. Off by default.
 					</InfoPopover>
 				</div>
 				<div class="relative flex items-center justify-between rounded-md border p-2">

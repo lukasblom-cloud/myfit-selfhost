@@ -9,7 +9,15 @@ const defaultMesocycle: MesocycleWithoutIds = {
 	startDate: null,
 	endDate: null,
 	startOverloadPercentage: 2.5,
-	lastSetToFailure: true,
+	// Upstream defaulted this to true (WhyAsh5114, 783e54d, Jun 2024). Flipped
+	// for Dead Lifts because of what it actually does: workoutUtils.ts forces the
+	// LAST SET OF EVERY EXERCISE to 0 RIR, in EVERY week of the block. With the
+	// default RIRProgression that means weeks 1-3 are nominally "3 RIR" while
+	// still taking every exercise to true failure — which is not the block RP
+	// prescribes, where you approach failure only as the mesocycle matures.
+	// Still available per-mesocycle and per-exercise; it is just no longer what
+	// you get without asking.
+	lastSetToFailure: false,
 	forceRIRMatching: true
 };
 
