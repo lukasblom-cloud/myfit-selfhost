@@ -12,8 +12,12 @@
 		{ text: 'Exercise splits', href: '/exercise-splits' },
 		{ text: 'Mesocycles', href: '/mesocycles' },
 		{ text: 'Workouts', href: '/workouts' },
+		{ text: 'Crew', href: '/crew' },
 		null,
-		{ text: 'Docs', href: '/docs' }
+		{ text: 'Docs', href: '/docs' },
+		// AGPL-3.0 s13: anyone using this over the network is entitled to the
+		// modified source, so the offer has to be reachable from the app itself.
+		{ text: 'Source', href: '/docs#source' }
 	];
 </script>
 

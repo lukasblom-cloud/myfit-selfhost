@@ -4,12 +4,14 @@ import { exerciseSplits } from './routes/exerciseSplits';
 import { mesocycles } from './routes/mesocycles';
 import { workouts } from './routes/workouts';
 import { users } from './routes/users';
+import { crew } from './routes/crew';
 
 export const router = t.router({
 	exerciseSplits,
 	mesocycles,
 	workouts,
-	users
+	users,
+	crew
 });
 
 export const createCaller = t.createCallerFactory(router);

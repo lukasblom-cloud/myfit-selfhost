@@ -31,10 +31,12 @@ select
   m.id,
   m.name,
   m."startDate" as start_date,
-  cardinality(m."RIRProgression") as total_weeks,
+  -- RIRProgression is indexed BY RIR value; each element is the number of weeks
+  -- spent at that RIR. Block length is therefore the SUM, not the cardinality.
+  (select sum(x) from unnest(m."RIRProgression") as x)::int as total_weeks,
   least(
     (floor(extract(epoch from (now() - m."startDate")) / 604800)::int + 1),
-    cardinality(m."RIRProgression")
+    (select sum(x) from unnest(m."RIRProgression") as x)::int
   ) as week_number,
   m."RIRProgression" as rir_progression,
   (select count(*) from myfit."WorkoutOfMesocycle" wom where wom."mesocycleId" = m.id) as workouts_logged

@@ -96,9 +96,21 @@
 		Edit. Currently, for lengthened partials, you can add a note to each exercise.
 	</p>
 
-	<h2 class="italic">"I need more help!"</h2>
+	<h2 id="source">Source code and licence</h2>
 	<p>
-		Feel free to <a href="https://github.com/WhyAsh5114/issues">open an issue</a> on the GitHub repository, will be glad
-		to help you out and add more details to the docs
+		Dead Lifts is a modified version of <a href="https://github.com/WhyAsh5114/MyFit">MyFit</a> by WhyAsh5114,
+		licensed under the
+		<a href="https://www.gnu.org/licenses/agpl-3.0.html">GNU Affero General Public License, version 3</a>.
+	</p>
+	<p>
+		Because this is a modified AGPL program you interact with over a network, section 13 of that licence entitles you
+		to the Corresponding Source of <em>this</em> version — not just the original. The modified source lives at
+		<a href="https://github.com/lukasblom-cloud/myfit-selfhost">github.com/lukasblom-cloud/myfit-selfhost</a>
+		(branch <code>selfhost</code>). If that link asks you to sign in, ask the person who invited you here and
+		they'll give you access.
+	</p>
+	<p>
+		Modifications on top of upstream: Cloudflare Access single sign-on in place of OAuth providers, multi-user
+		sessions, Crew sharing, a read-only mesocycle-state feed, and rebranding.
 	</p>
 </div>

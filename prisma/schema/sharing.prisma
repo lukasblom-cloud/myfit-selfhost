@@ -1,0 +1,37 @@
+/// Crew sharing — not in upstream MyFit.
+///
+/// Upstream's data model is entirely userId-scoped with no notion of one user
+/// seeing another's training. This is the whole sharing layer: an owner grants
+/// a viewer read access to their training summary. Nothing here ever grants
+/// write access — the crew router has no mutations that touch another user's
+/// rows, and the UI is read-only by construction.
+model SharedAccess {
+  id String @id @default(cuid()) /// @zod.string.cuid2()
+
+  /// Whose training is being shared.
+  owner   User   @relation("SharedAccessOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId String
+
+  /// The grant is keyed on EMAIL, not on a User row, so access can be granted
+  /// to someone who has never logged in. `viewerId` stays null until that email
+  /// first signs in, at which point getOrCreateUser backfills it. Without this
+  /// you could not invite anyone new — which is exactly how an invitee
+  /// ended up in the allowlist with no way to use it.
+  viewerEmail String
+  viewer      User?   @relation("SharedAccessViewer", fields: [viewerId], references: [id], onDelete: SetNull)
+  viewerId    String?
+
+  scope     SharedAccessScope @default(Summary)
+  createdAt DateTime          @default(now())
+
+  /// One row per direction. A granting B says nothing about B granting A.
+  @@unique([ownerId, viewerEmail])
+  @@index([viewerId])
+}
+
+enum SharedAccessScope {
+  /// The crew card only: meso name, week, RIR, last session, sets this week.
+  Summary
+  /// Also per-session detail (date, duration, exercises, sets).
+  Sessions
+}

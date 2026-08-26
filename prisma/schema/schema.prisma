@@ -29,6 +29,11 @@ model User {
   workouts       Workout[]
   migratedFromV2 Boolean?
   settings       UserSettings?
+
+  /// Crew sharing (not upstream). `sharesGranted` = people I let see my
+  /// training; `sharesReceived` = people whose training I can see.
+  sharesGranted  SharedAccess[] @relation("SharedAccessOwner")
+  sharesReceived SharedAccess[] @relation("SharedAccessViewer")
 }
 
 model Account {

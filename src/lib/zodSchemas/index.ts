@@ -36,6 +36,8 @@ export const VerificationTokenScalarFieldEnumSchema = z.enum(['identifier','toke
 
 export const UserSettingsScalarFieldEnumSchema = z.enum(['id','userId','motivationalQuotesEnabled','quotesDisplayModes']);
 
+export const SharedAccessScalarFieldEnumSchema = z.enum(['id','ownerId','viewerEmail','viewerId','scope','createdAt']);
+
 export const WorkoutOfMesocycleScalarFieldEnumSchema = z.enum(['id','workoutId','mesocycleId','splitDayIndex','workoutStatus']);
 
 export const WorkoutScalarFieldEnumSchema = z.enum(['id','userBodyweight','startedAt','endedAt','userId','note']);
@@ -71,6 +73,10 @@ export type WorkoutStatusType = `${z.infer<typeof WorkoutStatusSchema>}`
 export const QuotesDisplayModeSchema = z.enum(['PRE_WORKOUT','POST_WORKOUT','BETWEEN_SETS']);
 
 export type QuotesDisplayModeType = `${z.infer<typeof QuotesDisplayModeSchema>}`
+
+export const SharedAccessScopeSchema = z.enum(['Summary','Sessions']);
+
+export type SharedAccessScopeType = `${z.infer<typeof SharedAccessScopeSchema>}`
 
 /////////////////////////////////////////
 // MODELS
@@ -281,6 +287,37 @@ export const UserSettingsSchema = z.object({
 })
 
 export type UserSettings = z.infer<typeof UserSettingsSchema>
+
+/////////////////////////////////////////
+// SHARED ACCESS SCHEMA
+/////////////////////////////////////////
+
+/**
+ * Crew sharing — not in upstream MyFit.
+ * 
+ * Upstream's data model is entirely userId-scoped with no notion of one user
+ * seeing another's training. This is the whole sharing layer: an owner grants
+ * a viewer read access to their training summary. Nothing here ever grants
+ * write access — the crew router has no mutations that touch another user's
+ * rows, and the UI is read-only by construction.
+ */
+export const SharedAccessSchema = z.object({
+  scope: SharedAccessScopeSchema,
+  id: z.string().cuid2(),
+  ownerId: z.string(),
+  /**
+   * The grant is keyed on EMAIL, not on a User row, so access can be granted
+   * to someone who has never logged in. `viewerId` stays null until that email
+   * first signs in, at which point getOrCreateUser backfills it. Without this
+   * you could not invite anyone new — which is exactly how an invitee
+   * ended up in the allowlist with no way to use it.
+   */
+  viewerEmail: z.string(),
+  viewerId: z.string().nullable(),
+  createdAt: z.coerce.date(),
+})
+
+export type SharedAccess = z.infer<typeof SharedAccessSchema>
 
 /////////////////////////////////////////
 // WORKOUT OF MESOCYCLE SCHEMA
@@ -620,6 +657,8 @@ export const UserIncludeSchema: z.ZodType<Prisma.UserInclude> = z.object({
   mesocycles: z.union([z.boolean(),z.lazy(() => MesocycleFindManyArgsSchema)]).optional(),
   workouts: z.union([z.boolean(),z.lazy(() => WorkoutFindManyArgsSchema)]).optional(),
   settings: z.union([z.boolean(),z.lazy(() => UserSettingsArgsSchema)]).optional(),
+  sharesGranted: z.union([z.boolean(),z.lazy(() => SharedAccessFindManyArgsSchema)]).optional(),
+  sharesReceived: z.union([z.boolean(),z.lazy(() => SharedAccessFindManyArgsSchema)]).optional(),
   _count: z.union([z.boolean(),z.lazy(() => UserCountOutputTypeArgsSchema)]).optional(),
 }).strict()
 
@@ -638,6 +677,8 @@ export const UserCountOutputTypeSelectSchema: z.ZodType<Prisma.UserCountOutputTy
   exerciseSplits: z.boolean().optional(),
   mesocycles: z.boolean().optional(),
   workouts: z.boolean().optional(),
+  sharesGranted: z.boolean().optional(),
+  sharesReceived: z.boolean().optional(),
 }).strict();
 
 export const UserSelectSchema: z.ZodType<Prisma.UserSelect> = z.object({
@@ -655,6 +696,8 @@ export const UserSelectSchema: z.ZodType<Prisma.UserSelect> = z.object({
   mesocycles: z.union([z.boolean(),z.lazy(() => MesocycleFindManyArgsSchema)]).optional(),
   workouts: z.union([z.boolean(),z.lazy(() => WorkoutFindManyArgsSchema)]).optional(),
   settings: z.union([z.boolean(),z.lazy(() => UserSettingsArgsSchema)]).optional(),
+  sharesGranted: z.union([z.boolean(),z.lazy(() => SharedAccessFindManyArgsSchema)]).optional(),
+  sharesReceived: z.union([z.boolean(),z.lazy(() => SharedAccessFindManyArgsSchema)]).optional(),
   _count: z.union([z.boolean(),z.lazy(() => UserCountOutputTypeArgsSchema)]).optional(),
 }).strict()
 
@@ -735,6 +778,30 @@ export const UserSettingsSelectSchema: z.ZodType<Prisma.UserSettingsSelect> = z.
   motivationalQuotesEnabled: z.boolean().optional(),
   quotesDisplayModes: z.boolean().optional(),
   user: z.union([z.boolean(),z.lazy(() => UserArgsSchema)]).optional(),
+}).strict()
+
+// SHARED ACCESS
+//------------------------------------------------------
+
+export const SharedAccessIncludeSchema: z.ZodType<Prisma.SharedAccessInclude> = z.object({
+  owner: z.union([z.boolean(),z.lazy(() => UserArgsSchema)]).optional(),
+  viewer: z.union([z.boolean(),z.lazy(() => UserArgsSchema)]).optional(),
+}).strict()
+
+export const SharedAccessArgsSchema: z.ZodType<Prisma.SharedAccessDefaultArgs> = z.object({
+  select: z.lazy(() => SharedAccessSelectSchema).optional(),
+  include: z.lazy(() => SharedAccessIncludeSchema).optional(),
+}).strict();
+
+export const SharedAccessSelectSchema: z.ZodType<Prisma.SharedAccessSelect> = z.object({
+  id: z.boolean().optional(),
+  ownerId: z.boolean().optional(),
+  viewerEmail: z.boolean().optional(),
+  viewerId: z.boolean().optional(),
+  scope: z.boolean().optional(),
+  createdAt: z.boolean().optional(),
+  owner: z.union([z.boolean(),z.lazy(() => UserArgsSchema)]).optional(),
+  viewer: z.union([z.boolean(),z.lazy(() => UserArgsSchema)]).optional(),
 }).strict()
 
 // WORKOUT OF MESOCYCLE
@@ -1515,6 +1582,8 @@ export const UserWhereInputSchema: z.ZodType<Prisma.UserWhereInput> = z.object({
   mesocycles: z.lazy(() => MesocycleListRelationFilterSchema).optional(),
   workouts: z.lazy(() => WorkoutListRelationFilterSchema).optional(),
   settings: z.union([ z.lazy(() => UserSettingsNullableScalarRelationFilterSchema),z.lazy(() => UserSettingsWhereInputSchema) ]).optional().nullable(),
+  sharesGranted: z.lazy(() => SharedAccessListRelationFilterSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessListRelationFilterSchema).optional()
 }).strict();
 
 export const UserOrderByWithRelationInputSchema: z.ZodType<Prisma.UserOrderByWithRelationInput> = z.object({
@@ -1531,7 +1600,9 @@ export const UserOrderByWithRelationInputSchema: z.ZodType<Prisma.UserOrderByWit
   exerciseSplits: z.lazy(() => ExerciseSplitOrderByRelationAggregateInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleOrderByRelationAggregateInputSchema).optional(),
   workouts: z.lazy(() => WorkoutOrderByRelationAggregateInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsOrderByWithRelationInputSchema).optional()
+  settings: z.lazy(() => UserSettingsOrderByWithRelationInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessOrderByRelationAggregateInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessOrderByRelationAggregateInputSchema).optional()
 }).strict();
 
 export const UserWhereUniqueInputSchema: z.ZodType<Prisma.UserWhereUniqueInput> = z.union([
@@ -1564,6 +1635,8 @@ export const UserWhereUniqueInputSchema: z.ZodType<Prisma.UserWhereUniqueInput> 
   mesocycles: z.lazy(() => MesocycleListRelationFilterSchema).optional(),
   workouts: z.lazy(() => WorkoutListRelationFilterSchema).optional(),
   settings: z.union([ z.lazy(() => UserSettingsNullableScalarRelationFilterSchema),z.lazy(() => UserSettingsWhereInputSchema) ]).optional().nullable(),
+  sharesGranted: z.lazy(() => SharedAccessListRelationFilterSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessListRelationFilterSchema).optional()
 }).strict());
 
 export const UserOrderByWithAggregationInputSchema: z.ZodType<Prisma.UserOrderByWithAggregationInput> = z.object({
@@ -1859,6 +1932,82 @@ export const UserSettingsScalarWhereWithAggregatesInputSchema: z.ZodType<Prisma.
   userId: z.union([ z.lazy(() => StringWithAggregatesFilterSchema),z.string() ]).optional(),
   motivationalQuotesEnabled: z.union([ z.lazy(() => BoolWithAggregatesFilterSchema),z.boolean() ]).optional(),
   quotesDisplayModes: z.lazy(() => EnumQuotesDisplayModeNullableListFilterSchema).optional()
+}).strict();
+
+export const SharedAccessWhereInputSchema: z.ZodType<Prisma.SharedAccessWhereInput> = z.object({
+  AND: z.union([ z.lazy(() => SharedAccessWhereInputSchema),z.lazy(() => SharedAccessWhereInputSchema).array() ]).optional(),
+  OR: z.lazy(() => SharedAccessWhereInputSchema).array().optional(),
+  NOT: z.union([ z.lazy(() => SharedAccessWhereInputSchema),z.lazy(() => SharedAccessWhereInputSchema).array() ]).optional(),
+  id: z.union([ z.lazy(() => StringFilterSchema),z.string() ]).optional(),
+  ownerId: z.union([ z.lazy(() => StringFilterSchema),z.string() ]).optional(),
+  viewerEmail: z.union([ z.lazy(() => StringFilterSchema),z.string() ]).optional(),
+  viewerId: z.union([ z.lazy(() => StringNullableFilterSchema),z.string() ]).optional().nullable(),
+  scope: z.union([ z.lazy(() => EnumSharedAccessScopeFilterSchema),z.lazy(() => SharedAccessScopeSchema) ]).optional(),
+  createdAt: z.union([ z.lazy(() => DateTimeFilterSchema),z.coerce.date() ]).optional(),
+  owner: z.union([ z.lazy(() => UserScalarRelationFilterSchema),z.lazy(() => UserWhereInputSchema) ]).optional(),
+  viewer: z.union([ z.lazy(() => UserNullableScalarRelationFilterSchema),z.lazy(() => UserWhereInputSchema) ]).optional().nullable(),
+}).strict();
+
+export const SharedAccessOrderByWithRelationInputSchema: z.ZodType<Prisma.SharedAccessOrderByWithRelationInput> = z.object({
+  id: z.lazy(() => SortOrderSchema).optional(),
+  ownerId: z.lazy(() => SortOrderSchema).optional(),
+  viewerEmail: z.lazy(() => SortOrderSchema).optional(),
+  viewerId: z.union([ z.lazy(() => SortOrderSchema),z.lazy(() => SortOrderInputSchema) ]).optional(),
+  scope: z.lazy(() => SortOrderSchema).optional(),
+  createdAt: z.lazy(() => SortOrderSchema).optional(),
+  owner: z.lazy(() => UserOrderByWithRelationInputSchema).optional(),
+  viewer: z.lazy(() => UserOrderByWithRelationInputSchema).optional()
+}).strict();
+
+export const SharedAccessWhereUniqueInputSchema: z.ZodType<Prisma.SharedAccessWhereUniqueInput> = z.union([
+  z.object({
+    id: z.string().cuid2(),
+    ownerId_viewerEmail: z.lazy(() => SharedAccessOwnerIdViewerEmailCompoundUniqueInputSchema)
+  }),
+  z.object({
+    id: z.string().cuid2(),
+  }),
+  z.object({
+    ownerId_viewerEmail: z.lazy(() => SharedAccessOwnerIdViewerEmailCompoundUniqueInputSchema),
+  }),
+])
+.and(z.object({
+  id: z.string().cuid2().optional(),
+  ownerId_viewerEmail: z.lazy(() => SharedAccessOwnerIdViewerEmailCompoundUniqueInputSchema).optional(),
+  AND: z.union([ z.lazy(() => SharedAccessWhereInputSchema),z.lazy(() => SharedAccessWhereInputSchema).array() ]).optional(),
+  OR: z.lazy(() => SharedAccessWhereInputSchema).array().optional(),
+  NOT: z.union([ z.lazy(() => SharedAccessWhereInputSchema),z.lazy(() => SharedAccessWhereInputSchema).array() ]).optional(),
+  ownerId: z.union([ z.lazy(() => StringFilterSchema),z.string() ]).optional(),
+  viewerEmail: z.union([ z.lazy(() => StringFilterSchema),z.string() ]).optional(),
+  viewerId: z.union([ z.lazy(() => StringNullableFilterSchema),z.string() ]).optional().nullable(),
+  scope: z.union([ z.lazy(() => EnumSharedAccessScopeFilterSchema),z.lazy(() => SharedAccessScopeSchema) ]).optional(),
+  createdAt: z.union([ z.lazy(() => DateTimeFilterSchema),z.coerce.date() ]).optional(),
+  owner: z.union([ z.lazy(() => UserScalarRelationFilterSchema),z.lazy(() => UserWhereInputSchema) ]).optional(),
+  viewer: z.union([ z.lazy(() => UserNullableScalarRelationFilterSchema),z.lazy(() => UserWhereInputSchema) ]).optional().nullable(),
+}).strict());
+
+export const SharedAccessOrderByWithAggregationInputSchema: z.ZodType<Prisma.SharedAccessOrderByWithAggregationInput> = z.object({
+  id: z.lazy(() => SortOrderSchema).optional(),
+  ownerId: z.lazy(() => SortOrderSchema).optional(),
+  viewerEmail: z.lazy(() => SortOrderSchema).optional(),
+  viewerId: z.union([ z.lazy(() => SortOrderSchema),z.lazy(() => SortOrderInputSchema) ]).optional(),
+  scope: z.lazy(() => SortOrderSchema).optional(),
+  createdAt: z.lazy(() => SortOrderSchema).optional(),
+  _count: z.lazy(() => SharedAccessCountOrderByAggregateInputSchema).optional(),
+  _max: z.lazy(() => SharedAccessMaxOrderByAggregateInputSchema).optional(),
+  _min: z.lazy(() => SharedAccessMinOrderByAggregateInputSchema).optional()
+}).strict();
+
+export const SharedAccessScalarWhereWithAggregatesInputSchema: z.ZodType<Prisma.SharedAccessScalarWhereWithAggregatesInput> = z.object({
+  AND: z.union([ z.lazy(() => SharedAccessScalarWhereWithAggregatesInputSchema),z.lazy(() => SharedAccessScalarWhereWithAggregatesInputSchema).array() ]).optional(),
+  OR: z.lazy(() => SharedAccessScalarWhereWithAggregatesInputSchema).array().optional(),
+  NOT: z.union([ z.lazy(() => SharedAccessScalarWhereWithAggregatesInputSchema),z.lazy(() => SharedAccessScalarWhereWithAggregatesInputSchema).array() ]).optional(),
+  id: z.union([ z.lazy(() => StringWithAggregatesFilterSchema),z.string() ]).optional(),
+  ownerId: z.union([ z.lazy(() => StringWithAggregatesFilterSchema),z.string() ]).optional(),
+  viewerEmail: z.union([ z.lazy(() => StringWithAggregatesFilterSchema),z.string() ]).optional(),
+  viewerId: z.union([ z.lazy(() => StringNullableWithAggregatesFilterSchema),z.string() ]).optional().nullable(),
+  scope: z.union([ z.lazy(() => EnumSharedAccessScopeWithAggregatesFilterSchema),z.lazy(() => SharedAccessScopeSchema) ]).optional(),
+  createdAt: z.union([ z.lazy(() => DateTimeWithAggregatesFilterSchema),z.coerce.date() ]).optional(),
 }).strict();
 
 export const WorkoutOfMesocycleWhereInputSchema: z.ZodType<Prisma.WorkoutOfMesocycleWhereInput> = z.object({
@@ -2911,7 +3060,9 @@ export const UserCreateInputSchema: z.ZodType<Prisma.UserCreateInput> = z.object
   exerciseSplits: z.lazy(() => ExerciseSplitCreateNestedManyWithoutUserInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleCreateNestedManyWithoutUserInputSchema).optional(),
   workouts: z.lazy(() => WorkoutCreateNestedManyWithoutUserInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsCreateNestedOneWithoutUserInputSchema).optional()
+  settings: z.lazy(() => UserSettingsCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessCreateNestedManyWithoutOwnerInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessCreateNestedManyWithoutViewerInputSchema).optional()
 }).strict();
 
 export const UserUncheckedCreateInputSchema: z.ZodType<Prisma.UserUncheckedCreateInput> = z.object({
@@ -2928,7 +3079,9 @@ export const UserUncheckedCreateInputSchema: z.ZodType<Prisma.UserUncheckedCreat
   exerciseSplits: z.lazy(() => ExerciseSplitUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
   workouts: z.lazy(() => WorkoutUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUncheckedCreateNestedOneWithoutUserInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUncheckedCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutOwnerInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutViewerInputSchema).optional()
 }).strict();
 
 export const UserUpdateInputSchema: z.ZodType<Prisma.UserUpdateInput> = z.object({
@@ -2945,7 +3098,9 @@ export const UserUpdateInputSchema: z.ZodType<Prisma.UserUpdateInput> = z.object
   exerciseSplits: z.lazy(() => ExerciseSplitUpdateManyWithoutUserNestedInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUpdateManyWithoutUserNestedInputSchema).optional(),
   workouts: z.lazy(() => WorkoutUpdateManyWithoutUserNestedInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUpdateOneWithoutUserNestedInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUpdateManyWithoutOwnerNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUpdateManyWithoutViewerNestedInputSchema).optional()
 }).strict();
 
 export const UserUncheckedUpdateInputSchema: z.ZodType<Prisma.UserUncheckedUpdateInput> = z.object({
@@ -2962,7 +3117,9 @@ export const UserUncheckedUpdateInputSchema: z.ZodType<Prisma.UserUncheckedUpdat
   exerciseSplits: z.lazy(() => ExerciseSplitUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
   workouts: z.lazy(() => WorkoutUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUncheckedUpdateOneWithoutUserNestedInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUncheckedUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutOwnerNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutViewerNestedInputSchema).optional()
 }).strict();
 
 export const UserCreateManyInputSchema: z.ZodType<Prisma.UserCreateManyInput> = z.object({
@@ -3252,6 +3409,67 @@ export const UserSettingsUncheckedUpdateManyInputSchema: z.ZodType<Prisma.UserSe
   userId: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
   motivationalQuotesEnabled: z.union([ z.boolean(),z.lazy(() => BoolFieldUpdateOperationsInputSchema) ]).optional(),
   quotesDisplayModes: z.union([ z.lazy(() => UserSettingsUpdatequotesDisplayModesInputSchema),z.lazy(() => QuotesDisplayModeSchema).array() ]).optional(),
+}).strict();
+
+export const SharedAccessCreateInputSchema: z.ZodType<Prisma.SharedAccessCreateInput> = z.object({
+  id: z.string().cuid2().optional(),
+  viewerEmail: z.string(),
+  scope: z.lazy(() => SharedAccessScopeSchema).optional(),
+  createdAt: z.coerce.date().optional(),
+  owner: z.lazy(() => UserCreateNestedOneWithoutSharesGrantedInputSchema),
+  viewer: z.lazy(() => UserCreateNestedOneWithoutSharesReceivedInputSchema).optional()
+}).strict();
+
+export const SharedAccessUncheckedCreateInputSchema: z.ZodType<Prisma.SharedAccessUncheckedCreateInput> = z.object({
+  id: z.string().cuid2().optional(),
+  ownerId: z.string(),
+  viewerEmail: z.string(),
+  viewerId: z.string().optional().nullable(),
+  scope: z.lazy(() => SharedAccessScopeSchema).optional(),
+  createdAt: z.coerce.date().optional()
+}).strict();
+
+export const SharedAccessUpdateInputSchema: z.ZodType<Prisma.SharedAccessUpdateInput> = z.object({
+  id: z.union([ z.string().cuid2(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  viewerEmail: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  scope: z.union([ z.lazy(() => SharedAccessScopeSchema),z.lazy(() => EnumSharedAccessScopeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  owner: z.lazy(() => UserUpdateOneRequiredWithoutSharesGrantedNestedInputSchema).optional(),
+  viewer: z.lazy(() => UserUpdateOneWithoutSharesReceivedNestedInputSchema).optional()
+}).strict();
+
+export const SharedAccessUncheckedUpdateInputSchema: z.ZodType<Prisma.SharedAccessUncheckedUpdateInput> = z.object({
+  id: z.union([ z.string().cuid2(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  ownerId: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  viewerEmail: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  viewerId: z.union([ z.string(),z.lazy(() => NullableStringFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  scope: z.union([ z.lazy(() => SharedAccessScopeSchema),z.lazy(() => EnumSharedAccessScopeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+}).strict();
+
+export const SharedAccessCreateManyInputSchema: z.ZodType<Prisma.SharedAccessCreateManyInput> = z.object({
+  id: z.string().cuid2().optional(),
+  ownerId: z.string(),
+  viewerEmail: z.string(),
+  viewerId: z.string().optional().nullable(),
+  scope: z.lazy(() => SharedAccessScopeSchema).optional(),
+  createdAt: z.coerce.date().optional()
+}).strict();
+
+export const SharedAccessUpdateManyMutationInputSchema: z.ZodType<Prisma.SharedAccessUpdateManyMutationInput> = z.object({
+  id: z.union([ z.string().cuid2(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  viewerEmail: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  scope: z.union([ z.lazy(() => SharedAccessScopeSchema),z.lazy(() => EnumSharedAccessScopeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+}).strict();
+
+export const SharedAccessUncheckedUpdateManyInputSchema: z.ZodType<Prisma.SharedAccessUncheckedUpdateManyInput> = z.object({
+  id: z.union([ z.string().cuid2(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  ownerId: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  viewerEmail: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  viewerId: z.union([ z.string(),z.lazy(() => NullableStringFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  scope: z.union([ z.lazy(() => SharedAccessScopeSchema),z.lazy(() => EnumSharedAccessScopeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
 }).strict();
 
 export const WorkoutOfMesocycleCreateInputSchema: z.ZodType<Prisma.WorkoutOfMesocycleCreateInput> = z.object({
@@ -4437,6 +4655,12 @@ export const UserSettingsNullableScalarRelationFilterSchema: z.ZodType<Prisma.Us
   isNot: z.lazy(() => UserSettingsWhereInputSchema).optional().nullable()
 }).strict();
 
+export const SharedAccessListRelationFilterSchema: z.ZodType<Prisma.SharedAccessListRelationFilter> = z.object({
+  every: z.lazy(() => SharedAccessWhereInputSchema).optional(),
+  some: z.lazy(() => SharedAccessWhereInputSchema).optional(),
+  none: z.lazy(() => SharedAccessWhereInputSchema).optional()
+}).strict();
+
 export const AccountOrderByRelationAggregateInputSchema: z.ZodType<Prisma.AccountOrderByRelationAggregateInput> = z.object({
   _count: z.lazy(() => SortOrderSchema).optional()
 }).strict();
@@ -4450,6 +4674,10 @@ export const ExerciseSplitOrderByRelationAggregateInputSchema: z.ZodType<Prisma.
 }).strict();
 
 export const WorkoutOrderByRelationAggregateInputSchema: z.ZodType<Prisma.WorkoutOrderByRelationAggregateInput> = z.object({
+  _count: z.lazy(() => SortOrderSchema).optional()
+}).strict();
+
+export const SharedAccessOrderByRelationAggregateInputSchema: z.ZodType<Prisma.SharedAccessOrderByRelationAggregateInput> = z.object({
   _count: z.lazy(() => SortOrderSchema).optional()
 }).strict();
 
@@ -4633,6 +4861,60 @@ export const UserSettingsMinOrderByAggregateInputSchema: z.ZodType<Prisma.UserSe
   id: z.lazy(() => SortOrderSchema).optional(),
   userId: z.lazy(() => SortOrderSchema).optional(),
   motivationalQuotesEnabled: z.lazy(() => SortOrderSchema).optional()
+}).strict();
+
+export const EnumSharedAccessScopeFilterSchema: z.ZodType<Prisma.EnumSharedAccessScopeFilter> = z.object({
+  equals: z.lazy(() => SharedAccessScopeSchema).optional(),
+  in: z.lazy(() => SharedAccessScopeSchema).array().optional(),
+  notIn: z.lazy(() => SharedAccessScopeSchema).array().optional(),
+  not: z.union([ z.lazy(() => SharedAccessScopeSchema),z.lazy(() => NestedEnumSharedAccessScopeFilterSchema) ]).optional(),
+}).strict();
+
+export const UserNullableScalarRelationFilterSchema: z.ZodType<Prisma.UserNullableScalarRelationFilter> = z.object({
+  is: z.lazy(() => UserWhereInputSchema).optional().nullable(),
+  isNot: z.lazy(() => UserWhereInputSchema).optional().nullable()
+}).strict();
+
+export const SharedAccessOwnerIdViewerEmailCompoundUniqueInputSchema: z.ZodType<Prisma.SharedAccessOwnerIdViewerEmailCompoundUniqueInput> = z.object({
+  ownerId: z.string(),
+  viewerEmail: z.string()
+}).strict();
+
+export const SharedAccessCountOrderByAggregateInputSchema: z.ZodType<Prisma.SharedAccessCountOrderByAggregateInput> = z.object({
+  id: z.lazy(() => SortOrderSchema).optional(),
+  ownerId: z.lazy(() => SortOrderSchema).optional(),
+  viewerEmail: z.lazy(() => SortOrderSchema).optional(),
+  viewerId: z.lazy(() => SortOrderSchema).optional(),
+  scope: z.lazy(() => SortOrderSchema).optional(),
+  createdAt: z.lazy(() => SortOrderSchema).optional()
+}).strict();
+
+export const SharedAccessMaxOrderByAggregateInputSchema: z.ZodType<Prisma.SharedAccessMaxOrderByAggregateInput> = z.object({
+  id: z.lazy(() => SortOrderSchema).optional(),
+  ownerId: z.lazy(() => SortOrderSchema).optional(),
+  viewerEmail: z.lazy(() => SortOrderSchema).optional(),
+  viewerId: z.lazy(() => SortOrderSchema).optional(),
+  scope: z.lazy(() => SortOrderSchema).optional(),
+  createdAt: z.lazy(() => SortOrderSchema).optional()
+}).strict();
+
+export const SharedAccessMinOrderByAggregateInputSchema: z.ZodType<Prisma.SharedAccessMinOrderByAggregateInput> = z.object({
+  id: z.lazy(() => SortOrderSchema).optional(),
+  ownerId: z.lazy(() => SortOrderSchema).optional(),
+  viewerEmail: z.lazy(() => SortOrderSchema).optional(),
+  viewerId: z.lazy(() => SortOrderSchema).optional(),
+  scope: z.lazy(() => SortOrderSchema).optional(),
+  createdAt: z.lazy(() => SortOrderSchema).optional()
+}).strict();
+
+export const EnumSharedAccessScopeWithAggregatesFilterSchema: z.ZodType<Prisma.EnumSharedAccessScopeWithAggregatesFilter> = z.object({
+  equals: z.lazy(() => SharedAccessScopeSchema).optional(),
+  in: z.lazy(() => SharedAccessScopeSchema).array().optional(),
+  notIn: z.lazy(() => SharedAccessScopeSchema).array().optional(),
+  not: z.union([ z.lazy(() => SharedAccessScopeSchema),z.lazy(() => NestedEnumSharedAccessScopeWithAggregatesFilterSchema) ]).optional(),
+  _count: z.lazy(() => NestedIntFilterSchema).optional(),
+  _min: z.lazy(() => NestedEnumSharedAccessScopeFilterSchema).optional(),
+  _max: z.lazy(() => NestedEnumSharedAccessScopeFilterSchema).optional()
 }).strict();
 
 export const EnumWorkoutStatusNullableFilterSchema: z.ZodType<Prisma.EnumWorkoutStatusNullableFilter> = z.object({
@@ -5466,6 +5748,20 @@ export const UserSettingsCreateNestedOneWithoutUserInputSchema: z.ZodType<Prisma
   connect: z.lazy(() => UserSettingsWhereUniqueInputSchema).optional()
 }).strict();
 
+export const SharedAccessCreateNestedManyWithoutOwnerInputSchema: z.ZodType<Prisma.SharedAccessCreateNestedManyWithoutOwnerInput> = z.object({
+  create: z.union([ z.lazy(() => SharedAccessCreateWithoutOwnerInputSchema),z.lazy(() => SharedAccessCreateWithoutOwnerInputSchema).array(),z.lazy(() => SharedAccessUncheckedCreateWithoutOwnerInputSchema),z.lazy(() => SharedAccessUncheckedCreateWithoutOwnerInputSchema).array() ]).optional(),
+  connectOrCreate: z.union([ z.lazy(() => SharedAccessCreateOrConnectWithoutOwnerInputSchema),z.lazy(() => SharedAccessCreateOrConnectWithoutOwnerInputSchema).array() ]).optional(),
+  createMany: z.lazy(() => SharedAccessCreateManyOwnerInputEnvelopeSchema).optional(),
+  connect: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+}).strict();
+
+export const SharedAccessCreateNestedManyWithoutViewerInputSchema: z.ZodType<Prisma.SharedAccessCreateNestedManyWithoutViewerInput> = z.object({
+  create: z.union([ z.lazy(() => SharedAccessCreateWithoutViewerInputSchema),z.lazy(() => SharedAccessCreateWithoutViewerInputSchema).array(),z.lazy(() => SharedAccessUncheckedCreateWithoutViewerInputSchema),z.lazy(() => SharedAccessUncheckedCreateWithoutViewerInputSchema).array() ]).optional(),
+  connectOrCreate: z.union([ z.lazy(() => SharedAccessCreateOrConnectWithoutViewerInputSchema),z.lazy(() => SharedAccessCreateOrConnectWithoutViewerInputSchema).array() ]).optional(),
+  createMany: z.lazy(() => SharedAccessCreateManyViewerInputEnvelopeSchema).optional(),
+  connect: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+}).strict();
+
 export const AccountUncheckedCreateNestedManyWithoutUserInputSchema: z.ZodType<Prisma.AccountUncheckedCreateNestedManyWithoutUserInput> = z.object({
   create: z.union([ z.lazy(() => AccountCreateWithoutUserInputSchema),z.lazy(() => AccountCreateWithoutUserInputSchema).array(),z.lazy(() => AccountUncheckedCreateWithoutUserInputSchema),z.lazy(() => AccountUncheckedCreateWithoutUserInputSchema).array() ]).optional(),
   connectOrCreate: z.union([ z.lazy(() => AccountCreateOrConnectWithoutUserInputSchema),z.lazy(() => AccountCreateOrConnectWithoutUserInputSchema).array() ]).optional(),
@@ -5505,6 +5801,20 @@ export const UserSettingsUncheckedCreateNestedOneWithoutUserInputSchema: z.ZodTy
   create: z.union([ z.lazy(() => UserSettingsCreateWithoutUserInputSchema),z.lazy(() => UserSettingsUncheckedCreateWithoutUserInputSchema) ]).optional(),
   connectOrCreate: z.lazy(() => UserSettingsCreateOrConnectWithoutUserInputSchema).optional(),
   connect: z.lazy(() => UserSettingsWhereUniqueInputSchema).optional()
+}).strict();
+
+export const SharedAccessUncheckedCreateNestedManyWithoutOwnerInputSchema: z.ZodType<Prisma.SharedAccessUncheckedCreateNestedManyWithoutOwnerInput> = z.object({
+  create: z.union([ z.lazy(() => SharedAccessCreateWithoutOwnerInputSchema),z.lazy(() => SharedAccessCreateWithoutOwnerInputSchema).array(),z.lazy(() => SharedAccessUncheckedCreateWithoutOwnerInputSchema),z.lazy(() => SharedAccessUncheckedCreateWithoutOwnerInputSchema).array() ]).optional(),
+  connectOrCreate: z.union([ z.lazy(() => SharedAccessCreateOrConnectWithoutOwnerInputSchema),z.lazy(() => SharedAccessCreateOrConnectWithoutOwnerInputSchema).array() ]).optional(),
+  createMany: z.lazy(() => SharedAccessCreateManyOwnerInputEnvelopeSchema).optional(),
+  connect: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+}).strict();
+
+export const SharedAccessUncheckedCreateNestedManyWithoutViewerInputSchema: z.ZodType<Prisma.SharedAccessUncheckedCreateNestedManyWithoutViewerInput> = z.object({
+  create: z.union([ z.lazy(() => SharedAccessCreateWithoutViewerInputSchema),z.lazy(() => SharedAccessCreateWithoutViewerInputSchema).array(),z.lazy(() => SharedAccessUncheckedCreateWithoutViewerInputSchema),z.lazy(() => SharedAccessUncheckedCreateWithoutViewerInputSchema).array() ]).optional(),
+  connectOrCreate: z.union([ z.lazy(() => SharedAccessCreateOrConnectWithoutViewerInputSchema),z.lazy(() => SharedAccessCreateOrConnectWithoutViewerInputSchema).array() ]).optional(),
+  createMany: z.lazy(() => SharedAccessCreateManyViewerInputEnvelopeSchema).optional(),
+  connect: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
 }).strict();
 
 export const DateTimeFieldUpdateOperationsInputSchema: z.ZodType<Prisma.DateTimeFieldUpdateOperationsInput> = z.object({
@@ -5591,6 +5901,34 @@ export const UserSettingsUpdateOneWithoutUserNestedInputSchema: z.ZodType<Prisma
   update: z.union([ z.lazy(() => UserSettingsUpdateToOneWithWhereWithoutUserInputSchema),z.lazy(() => UserSettingsUpdateWithoutUserInputSchema),z.lazy(() => UserSettingsUncheckedUpdateWithoutUserInputSchema) ]).optional(),
 }).strict();
 
+export const SharedAccessUpdateManyWithoutOwnerNestedInputSchema: z.ZodType<Prisma.SharedAccessUpdateManyWithoutOwnerNestedInput> = z.object({
+  create: z.union([ z.lazy(() => SharedAccessCreateWithoutOwnerInputSchema),z.lazy(() => SharedAccessCreateWithoutOwnerInputSchema).array(),z.lazy(() => SharedAccessUncheckedCreateWithoutOwnerInputSchema),z.lazy(() => SharedAccessUncheckedCreateWithoutOwnerInputSchema).array() ]).optional(),
+  connectOrCreate: z.union([ z.lazy(() => SharedAccessCreateOrConnectWithoutOwnerInputSchema),z.lazy(() => SharedAccessCreateOrConnectWithoutOwnerInputSchema).array() ]).optional(),
+  upsert: z.union([ z.lazy(() => SharedAccessUpsertWithWhereUniqueWithoutOwnerInputSchema),z.lazy(() => SharedAccessUpsertWithWhereUniqueWithoutOwnerInputSchema).array() ]).optional(),
+  createMany: z.lazy(() => SharedAccessCreateManyOwnerInputEnvelopeSchema).optional(),
+  set: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  disconnect: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  delete: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  connect: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  update: z.union([ z.lazy(() => SharedAccessUpdateWithWhereUniqueWithoutOwnerInputSchema),z.lazy(() => SharedAccessUpdateWithWhereUniqueWithoutOwnerInputSchema).array() ]).optional(),
+  updateMany: z.union([ z.lazy(() => SharedAccessUpdateManyWithWhereWithoutOwnerInputSchema),z.lazy(() => SharedAccessUpdateManyWithWhereWithoutOwnerInputSchema).array() ]).optional(),
+  deleteMany: z.union([ z.lazy(() => SharedAccessScalarWhereInputSchema),z.lazy(() => SharedAccessScalarWhereInputSchema).array() ]).optional(),
+}).strict();
+
+export const SharedAccessUpdateManyWithoutViewerNestedInputSchema: z.ZodType<Prisma.SharedAccessUpdateManyWithoutViewerNestedInput> = z.object({
+  create: z.union([ z.lazy(() => SharedAccessCreateWithoutViewerInputSchema),z.lazy(() => SharedAccessCreateWithoutViewerInputSchema).array(),z.lazy(() => SharedAccessUncheckedCreateWithoutViewerInputSchema),z.lazy(() => SharedAccessUncheckedCreateWithoutViewerInputSchema).array() ]).optional(),
+  connectOrCreate: z.union([ z.lazy(() => SharedAccessCreateOrConnectWithoutViewerInputSchema),z.lazy(() => SharedAccessCreateOrConnectWithoutViewerInputSchema).array() ]).optional(),
+  upsert: z.union([ z.lazy(() => SharedAccessUpsertWithWhereUniqueWithoutViewerInputSchema),z.lazy(() => SharedAccessUpsertWithWhereUniqueWithoutViewerInputSchema).array() ]).optional(),
+  createMany: z.lazy(() => SharedAccessCreateManyViewerInputEnvelopeSchema).optional(),
+  set: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  disconnect: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  delete: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  connect: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  update: z.union([ z.lazy(() => SharedAccessUpdateWithWhereUniqueWithoutViewerInputSchema),z.lazy(() => SharedAccessUpdateWithWhereUniqueWithoutViewerInputSchema).array() ]).optional(),
+  updateMany: z.union([ z.lazy(() => SharedAccessUpdateManyWithWhereWithoutViewerInputSchema),z.lazy(() => SharedAccessUpdateManyWithWhereWithoutViewerInputSchema).array() ]).optional(),
+  deleteMany: z.union([ z.lazy(() => SharedAccessScalarWhereInputSchema),z.lazy(() => SharedAccessScalarWhereInputSchema).array() ]).optional(),
+}).strict();
+
 export const AccountUncheckedUpdateManyWithoutUserNestedInputSchema: z.ZodType<Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput> = z.object({
   create: z.union([ z.lazy(() => AccountCreateWithoutUserInputSchema),z.lazy(() => AccountCreateWithoutUserInputSchema).array(),z.lazy(() => AccountUncheckedCreateWithoutUserInputSchema),z.lazy(() => AccountUncheckedCreateWithoutUserInputSchema).array() ]).optional(),
   connectOrCreate: z.union([ z.lazy(() => AccountCreateOrConnectWithoutUserInputSchema),z.lazy(() => AccountCreateOrConnectWithoutUserInputSchema).array() ]).optional(),
@@ -5671,6 +6009,34 @@ export const UserSettingsUncheckedUpdateOneWithoutUserNestedInputSchema: z.ZodTy
   update: z.union([ z.lazy(() => UserSettingsUpdateToOneWithWhereWithoutUserInputSchema),z.lazy(() => UserSettingsUpdateWithoutUserInputSchema),z.lazy(() => UserSettingsUncheckedUpdateWithoutUserInputSchema) ]).optional(),
 }).strict();
 
+export const SharedAccessUncheckedUpdateManyWithoutOwnerNestedInputSchema: z.ZodType<Prisma.SharedAccessUncheckedUpdateManyWithoutOwnerNestedInput> = z.object({
+  create: z.union([ z.lazy(() => SharedAccessCreateWithoutOwnerInputSchema),z.lazy(() => SharedAccessCreateWithoutOwnerInputSchema).array(),z.lazy(() => SharedAccessUncheckedCreateWithoutOwnerInputSchema),z.lazy(() => SharedAccessUncheckedCreateWithoutOwnerInputSchema).array() ]).optional(),
+  connectOrCreate: z.union([ z.lazy(() => SharedAccessCreateOrConnectWithoutOwnerInputSchema),z.lazy(() => SharedAccessCreateOrConnectWithoutOwnerInputSchema).array() ]).optional(),
+  upsert: z.union([ z.lazy(() => SharedAccessUpsertWithWhereUniqueWithoutOwnerInputSchema),z.lazy(() => SharedAccessUpsertWithWhereUniqueWithoutOwnerInputSchema).array() ]).optional(),
+  createMany: z.lazy(() => SharedAccessCreateManyOwnerInputEnvelopeSchema).optional(),
+  set: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  disconnect: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  delete: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  connect: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  update: z.union([ z.lazy(() => SharedAccessUpdateWithWhereUniqueWithoutOwnerInputSchema),z.lazy(() => SharedAccessUpdateWithWhereUniqueWithoutOwnerInputSchema).array() ]).optional(),
+  updateMany: z.union([ z.lazy(() => SharedAccessUpdateManyWithWhereWithoutOwnerInputSchema),z.lazy(() => SharedAccessUpdateManyWithWhereWithoutOwnerInputSchema).array() ]).optional(),
+  deleteMany: z.union([ z.lazy(() => SharedAccessScalarWhereInputSchema),z.lazy(() => SharedAccessScalarWhereInputSchema).array() ]).optional(),
+}).strict();
+
+export const SharedAccessUncheckedUpdateManyWithoutViewerNestedInputSchema: z.ZodType<Prisma.SharedAccessUncheckedUpdateManyWithoutViewerNestedInput> = z.object({
+  create: z.union([ z.lazy(() => SharedAccessCreateWithoutViewerInputSchema),z.lazy(() => SharedAccessCreateWithoutViewerInputSchema).array(),z.lazy(() => SharedAccessUncheckedCreateWithoutViewerInputSchema),z.lazy(() => SharedAccessUncheckedCreateWithoutViewerInputSchema).array() ]).optional(),
+  connectOrCreate: z.union([ z.lazy(() => SharedAccessCreateOrConnectWithoutViewerInputSchema),z.lazy(() => SharedAccessCreateOrConnectWithoutViewerInputSchema).array() ]).optional(),
+  upsert: z.union([ z.lazy(() => SharedAccessUpsertWithWhereUniqueWithoutViewerInputSchema),z.lazy(() => SharedAccessUpsertWithWhereUniqueWithoutViewerInputSchema).array() ]).optional(),
+  createMany: z.lazy(() => SharedAccessCreateManyViewerInputEnvelopeSchema).optional(),
+  set: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  disconnect: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  delete: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  connect: z.union([ z.lazy(() => SharedAccessWhereUniqueInputSchema),z.lazy(() => SharedAccessWhereUniqueInputSchema).array() ]).optional(),
+  update: z.union([ z.lazy(() => SharedAccessUpdateWithWhereUniqueWithoutViewerInputSchema),z.lazy(() => SharedAccessUpdateWithWhereUniqueWithoutViewerInputSchema).array() ]).optional(),
+  updateMany: z.union([ z.lazy(() => SharedAccessUpdateManyWithWhereWithoutViewerInputSchema),z.lazy(() => SharedAccessUpdateManyWithWhereWithoutViewerInputSchema).array() ]).optional(),
+  deleteMany: z.union([ z.lazy(() => SharedAccessScalarWhereInputSchema),z.lazy(() => SharedAccessScalarWhereInputSchema).array() ]).optional(),
+}).strict();
+
 export const UserCreateNestedOneWithoutAccountsInputSchema: z.ZodType<Prisma.UserCreateNestedOneWithoutAccountsInput> = z.object({
   create: z.union([ z.lazy(() => UserCreateWithoutAccountsInputSchema),z.lazy(() => UserUncheckedCreateWithoutAccountsInputSchema) ]).optional(),
   connectOrCreate: z.lazy(() => UserCreateOrConnectWithoutAccountsInputSchema).optional(),
@@ -5720,6 +6086,40 @@ export const UserUpdateOneRequiredWithoutSettingsNestedInputSchema: z.ZodType<Pr
   upsert: z.lazy(() => UserUpsertWithoutSettingsInputSchema).optional(),
   connect: z.lazy(() => UserWhereUniqueInputSchema).optional(),
   update: z.union([ z.lazy(() => UserUpdateToOneWithWhereWithoutSettingsInputSchema),z.lazy(() => UserUpdateWithoutSettingsInputSchema),z.lazy(() => UserUncheckedUpdateWithoutSettingsInputSchema) ]).optional(),
+}).strict();
+
+export const UserCreateNestedOneWithoutSharesGrantedInputSchema: z.ZodType<Prisma.UserCreateNestedOneWithoutSharesGrantedInput> = z.object({
+  create: z.union([ z.lazy(() => UserCreateWithoutSharesGrantedInputSchema),z.lazy(() => UserUncheckedCreateWithoutSharesGrantedInputSchema) ]).optional(),
+  connectOrCreate: z.lazy(() => UserCreateOrConnectWithoutSharesGrantedInputSchema).optional(),
+  connect: z.lazy(() => UserWhereUniqueInputSchema).optional()
+}).strict();
+
+export const UserCreateNestedOneWithoutSharesReceivedInputSchema: z.ZodType<Prisma.UserCreateNestedOneWithoutSharesReceivedInput> = z.object({
+  create: z.union([ z.lazy(() => UserCreateWithoutSharesReceivedInputSchema),z.lazy(() => UserUncheckedCreateWithoutSharesReceivedInputSchema) ]).optional(),
+  connectOrCreate: z.lazy(() => UserCreateOrConnectWithoutSharesReceivedInputSchema).optional(),
+  connect: z.lazy(() => UserWhereUniqueInputSchema).optional()
+}).strict();
+
+export const EnumSharedAccessScopeFieldUpdateOperationsInputSchema: z.ZodType<Prisma.EnumSharedAccessScopeFieldUpdateOperationsInput> = z.object({
+  set: z.lazy(() => SharedAccessScopeSchema).optional()
+}).strict();
+
+export const UserUpdateOneRequiredWithoutSharesGrantedNestedInputSchema: z.ZodType<Prisma.UserUpdateOneRequiredWithoutSharesGrantedNestedInput> = z.object({
+  create: z.union([ z.lazy(() => UserCreateWithoutSharesGrantedInputSchema),z.lazy(() => UserUncheckedCreateWithoutSharesGrantedInputSchema) ]).optional(),
+  connectOrCreate: z.lazy(() => UserCreateOrConnectWithoutSharesGrantedInputSchema).optional(),
+  upsert: z.lazy(() => UserUpsertWithoutSharesGrantedInputSchema).optional(),
+  connect: z.lazy(() => UserWhereUniqueInputSchema).optional(),
+  update: z.union([ z.lazy(() => UserUpdateToOneWithWhereWithoutSharesGrantedInputSchema),z.lazy(() => UserUpdateWithoutSharesGrantedInputSchema),z.lazy(() => UserUncheckedUpdateWithoutSharesGrantedInputSchema) ]).optional(),
+}).strict();
+
+export const UserUpdateOneWithoutSharesReceivedNestedInputSchema: z.ZodType<Prisma.UserUpdateOneWithoutSharesReceivedNestedInput> = z.object({
+  create: z.union([ z.lazy(() => UserCreateWithoutSharesReceivedInputSchema),z.lazy(() => UserUncheckedCreateWithoutSharesReceivedInputSchema) ]).optional(),
+  connectOrCreate: z.lazy(() => UserCreateOrConnectWithoutSharesReceivedInputSchema).optional(),
+  upsert: z.lazy(() => UserUpsertWithoutSharesReceivedInputSchema).optional(),
+  disconnect: z.union([ z.boolean(),z.lazy(() => UserWhereInputSchema) ]).optional(),
+  delete: z.union([ z.boolean(),z.lazy(() => UserWhereInputSchema) ]).optional(),
+  connect: z.lazy(() => UserWhereUniqueInputSchema).optional(),
+  update: z.union([ z.lazy(() => UserUpdateToOneWithWhereWithoutSharesReceivedInputSchema),z.lazy(() => UserUpdateWithoutSharesReceivedInputSchema),z.lazy(() => UserUncheckedUpdateWithoutSharesReceivedInputSchema) ]).optional(),
 }).strict();
 
 export const WorkoutCreateNestedOneWithoutWorkoutOfMesocycleInputSchema: z.ZodType<Prisma.WorkoutCreateNestedOneWithoutWorkoutOfMesocycleInput> = z.object({
@@ -6265,6 +6665,23 @@ export const NestedDateTimeWithAggregatesFilterSchema: z.ZodType<Prisma.NestedDa
   _max: z.lazy(() => NestedDateTimeFilterSchema).optional()
 }).strict();
 
+export const NestedEnumSharedAccessScopeFilterSchema: z.ZodType<Prisma.NestedEnumSharedAccessScopeFilter> = z.object({
+  equals: z.lazy(() => SharedAccessScopeSchema).optional(),
+  in: z.lazy(() => SharedAccessScopeSchema).array().optional(),
+  notIn: z.lazy(() => SharedAccessScopeSchema).array().optional(),
+  not: z.union([ z.lazy(() => SharedAccessScopeSchema),z.lazy(() => NestedEnumSharedAccessScopeFilterSchema) ]).optional(),
+}).strict();
+
+export const NestedEnumSharedAccessScopeWithAggregatesFilterSchema: z.ZodType<Prisma.NestedEnumSharedAccessScopeWithAggregatesFilter> = z.object({
+  equals: z.lazy(() => SharedAccessScopeSchema).optional(),
+  in: z.lazy(() => SharedAccessScopeSchema).array().optional(),
+  notIn: z.lazy(() => SharedAccessScopeSchema).array().optional(),
+  not: z.union([ z.lazy(() => SharedAccessScopeSchema),z.lazy(() => NestedEnumSharedAccessScopeWithAggregatesFilterSchema) ]).optional(),
+  _count: z.lazy(() => NestedIntFilterSchema).optional(),
+  _min: z.lazy(() => NestedEnumSharedAccessScopeFilterSchema).optional(),
+  _max: z.lazy(() => NestedEnumSharedAccessScopeFilterSchema).optional()
+}).strict();
+
 export const NestedEnumWorkoutStatusNullableFilterSchema: z.ZodType<Prisma.NestedEnumWorkoutStatusNullableFilter> = z.object({
   equals: z.lazy(() => WorkoutStatusSchema).optional().nullable(),
   in: z.lazy(() => WorkoutStatusSchema).array().optional().nullable(),
@@ -6295,7 +6712,9 @@ export const UserCreateWithoutExerciseSplitsInputSchema: z.ZodType<Prisma.UserCr
   sessions: z.lazy(() => SessionCreateNestedManyWithoutUserInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleCreateNestedManyWithoutUserInputSchema).optional(),
   workouts: z.lazy(() => WorkoutCreateNestedManyWithoutUserInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsCreateNestedOneWithoutUserInputSchema).optional()
+  settings: z.lazy(() => UserSettingsCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessCreateNestedManyWithoutOwnerInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessCreateNestedManyWithoutViewerInputSchema).optional()
 }).strict();
 
 export const UserUncheckedCreateWithoutExerciseSplitsInputSchema: z.ZodType<Prisma.UserUncheckedCreateWithoutExerciseSplitsInput> = z.object({
@@ -6311,7 +6730,9 @@ export const UserUncheckedCreateWithoutExerciseSplitsInputSchema: z.ZodType<Pris
   sessions: z.lazy(() => SessionUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
   workouts: z.lazy(() => WorkoutUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUncheckedCreateNestedOneWithoutUserInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUncheckedCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutOwnerInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutViewerInputSchema).optional()
 }).strict();
 
 export const UserCreateOrConnectWithoutExerciseSplitsInputSchema: z.ZodType<Prisma.UserCreateOrConnectWithoutExerciseSplitsInput> = z.object({
@@ -6409,7 +6830,9 @@ export const UserUpdateWithoutExerciseSplitsInputSchema: z.ZodType<Prisma.UserUp
   sessions: z.lazy(() => SessionUpdateManyWithoutUserNestedInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUpdateManyWithoutUserNestedInputSchema).optional(),
   workouts: z.lazy(() => WorkoutUpdateManyWithoutUserNestedInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUpdateOneWithoutUserNestedInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUpdateManyWithoutOwnerNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUpdateManyWithoutViewerNestedInputSchema).optional()
 }).strict();
 
 export const UserUncheckedUpdateWithoutExerciseSplitsInputSchema: z.ZodType<Prisma.UserUncheckedUpdateWithoutExerciseSplitsInput> = z.object({
@@ -6425,7 +6848,9 @@ export const UserUncheckedUpdateWithoutExerciseSplitsInputSchema: z.ZodType<Pris
   sessions: z.lazy(() => SessionUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
   workouts: z.lazy(() => WorkoutUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUncheckedUpdateOneWithoutUserNestedInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUncheckedUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutOwnerNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutViewerNestedInputSchema).optional()
 }).strict();
 
 export const ExerciseSplitDayUpsertWithWhereUniqueWithoutExerciseSplitInputSchema: z.ZodType<Prisma.ExerciseSplitDayUpsertWithWhereUniqueWithoutExerciseSplitInput> = z.object({
@@ -6673,7 +7098,9 @@ export const UserCreateWithoutMesocyclesInputSchema: z.ZodType<Prisma.UserCreate
   sessions: z.lazy(() => SessionCreateNestedManyWithoutUserInputSchema).optional(),
   exerciseSplits: z.lazy(() => ExerciseSplitCreateNestedManyWithoutUserInputSchema).optional(),
   workouts: z.lazy(() => WorkoutCreateNestedManyWithoutUserInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsCreateNestedOneWithoutUserInputSchema).optional()
+  settings: z.lazy(() => UserSettingsCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessCreateNestedManyWithoutOwnerInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessCreateNestedManyWithoutViewerInputSchema).optional()
 }).strict();
 
 export const UserUncheckedCreateWithoutMesocyclesInputSchema: z.ZodType<Prisma.UserUncheckedCreateWithoutMesocyclesInput> = z.object({
@@ -6689,7 +7116,9 @@ export const UserUncheckedCreateWithoutMesocyclesInputSchema: z.ZodType<Prisma.U
   sessions: z.lazy(() => SessionUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
   exerciseSplits: z.lazy(() => ExerciseSplitUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
   workouts: z.lazy(() => WorkoutUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUncheckedCreateNestedOneWithoutUserInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUncheckedCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutOwnerInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutViewerInputSchema).optional()
 }).strict();
 
 export const UserCreateOrConnectWithoutMesocyclesInputSchema: z.ZodType<Prisma.UserCreateOrConnectWithoutMesocyclesInput> = z.object({
@@ -6818,7 +7247,9 @@ export const UserUpdateWithoutMesocyclesInputSchema: z.ZodType<Prisma.UserUpdate
   sessions: z.lazy(() => SessionUpdateManyWithoutUserNestedInputSchema).optional(),
   exerciseSplits: z.lazy(() => ExerciseSplitUpdateManyWithoutUserNestedInputSchema).optional(),
   workouts: z.lazy(() => WorkoutUpdateManyWithoutUserNestedInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUpdateOneWithoutUserNestedInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUpdateManyWithoutOwnerNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUpdateManyWithoutViewerNestedInputSchema).optional()
 }).strict();
 
 export const UserUncheckedUpdateWithoutMesocyclesInputSchema: z.ZodType<Prisma.UserUncheckedUpdateWithoutMesocyclesInput> = z.object({
@@ -6834,7 +7265,9 @@ export const UserUncheckedUpdateWithoutMesocyclesInputSchema: z.ZodType<Prisma.U
   sessions: z.lazy(() => SessionUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
   exerciseSplits: z.lazy(() => ExerciseSplitUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
   workouts: z.lazy(() => WorkoutUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUncheckedUpdateOneWithoutUserNestedInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUncheckedUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutOwnerNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutViewerNestedInputSchema).optional()
 }).strict();
 
 export const ExerciseSplitUpsertWithoutUsedByMesocyclesInputSchema: z.ZodType<Prisma.ExerciseSplitUpsertWithoutUsedByMesocyclesInput> = z.object({
@@ -7416,6 +7849,58 @@ export const UserSettingsCreateOrConnectWithoutUserInputSchema: z.ZodType<Prisma
   create: z.union([ z.lazy(() => UserSettingsCreateWithoutUserInputSchema),z.lazy(() => UserSettingsUncheckedCreateWithoutUserInputSchema) ]),
 }).strict();
 
+export const SharedAccessCreateWithoutOwnerInputSchema: z.ZodType<Prisma.SharedAccessCreateWithoutOwnerInput> = z.object({
+  id: z.string().cuid2().optional(),
+  viewerEmail: z.string(),
+  scope: z.lazy(() => SharedAccessScopeSchema).optional(),
+  createdAt: z.coerce.date().optional(),
+  viewer: z.lazy(() => UserCreateNestedOneWithoutSharesReceivedInputSchema).optional()
+}).strict();
+
+export const SharedAccessUncheckedCreateWithoutOwnerInputSchema: z.ZodType<Prisma.SharedAccessUncheckedCreateWithoutOwnerInput> = z.object({
+  id: z.string().cuid2().optional(),
+  viewerEmail: z.string(),
+  viewerId: z.string().optional().nullable(),
+  scope: z.lazy(() => SharedAccessScopeSchema).optional(),
+  createdAt: z.coerce.date().optional()
+}).strict();
+
+export const SharedAccessCreateOrConnectWithoutOwnerInputSchema: z.ZodType<Prisma.SharedAccessCreateOrConnectWithoutOwnerInput> = z.object({
+  where: z.lazy(() => SharedAccessWhereUniqueInputSchema),
+  create: z.union([ z.lazy(() => SharedAccessCreateWithoutOwnerInputSchema),z.lazy(() => SharedAccessUncheckedCreateWithoutOwnerInputSchema) ]),
+}).strict();
+
+export const SharedAccessCreateManyOwnerInputEnvelopeSchema: z.ZodType<Prisma.SharedAccessCreateManyOwnerInputEnvelope> = z.object({
+  data: z.union([ z.lazy(() => SharedAccessCreateManyOwnerInputSchema),z.lazy(() => SharedAccessCreateManyOwnerInputSchema).array() ]),
+  skipDuplicates: z.boolean().optional()
+}).strict();
+
+export const SharedAccessCreateWithoutViewerInputSchema: z.ZodType<Prisma.SharedAccessCreateWithoutViewerInput> = z.object({
+  id: z.string().cuid2().optional(),
+  viewerEmail: z.string(),
+  scope: z.lazy(() => SharedAccessScopeSchema).optional(),
+  createdAt: z.coerce.date().optional(),
+  owner: z.lazy(() => UserCreateNestedOneWithoutSharesGrantedInputSchema)
+}).strict();
+
+export const SharedAccessUncheckedCreateWithoutViewerInputSchema: z.ZodType<Prisma.SharedAccessUncheckedCreateWithoutViewerInput> = z.object({
+  id: z.string().cuid2().optional(),
+  ownerId: z.string(),
+  viewerEmail: z.string(),
+  scope: z.lazy(() => SharedAccessScopeSchema).optional(),
+  createdAt: z.coerce.date().optional()
+}).strict();
+
+export const SharedAccessCreateOrConnectWithoutViewerInputSchema: z.ZodType<Prisma.SharedAccessCreateOrConnectWithoutViewerInput> = z.object({
+  where: z.lazy(() => SharedAccessWhereUniqueInputSchema),
+  create: z.union([ z.lazy(() => SharedAccessCreateWithoutViewerInputSchema),z.lazy(() => SharedAccessUncheckedCreateWithoutViewerInputSchema) ]),
+}).strict();
+
+export const SharedAccessCreateManyViewerInputEnvelopeSchema: z.ZodType<Prisma.SharedAccessCreateManyViewerInputEnvelope> = z.object({
+  data: z.union([ z.lazy(() => SharedAccessCreateManyViewerInputSchema),z.lazy(() => SharedAccessCreateManyViewerInputSchema).array() ]),
+  skipDuplicates: z.boolean().optional()
+}).strict();
+
 export const AccountUpsertWithWhereUniqueWithoutUserInputSchema: z.ZodType<Prisma.AccountUpsertWithWhereUniqueWithoutUserInput> = z.object({
   where: z.lazy(() => AccountWhereUniqueInputSchema),
   update: z.union([ z.lazy(() => AccountUpdateWithoutUserInputSchema),z.lazy(() => AccountUncheckedUpdateWithoutUserInputSchema) ]),
@@ -7570,6 +8055,50 @@ export const UserSettingsUncheckedUpdateWithoutUserInputSchema: z.ZodType<Prisma
   quotesDisplayModes: z.union([ z.lazy(() => UserSettingsUpdatequotesDisplayModesInputSchema),z.lazy(() => QuotesDisplayModeSchema).array() ]).optional(),
 }).strict();
 
+export const SharedAccessUpsertWithWhereUniqueWithoutOwnerInputSchema: z.ZodType<Prisma.SharedAccessUpsertWithWhereUniqueWithoutOwnerInput> = z.object({
+  where: z.lazy(() => SharedAccessWhereUniqueInputSchema),
+  update: z.union([ z.lazy(() => SharedAccessUpdateWithoutOwnerInputSchema),z.lazy(() => SharedAccessUncheckedUpdateWithoutOwnerInputSchema) ]),
+  create: z.union([ z.lazy(() => SharedAccessCreateWithoutOwnerInputSchema),z.lazy(() => SharedAccessUncheckedCreateWithoutOwnerInputSchema) ]),
+}).strict();
+
+export const SharedAccessUpdateWithWhereUniqueWithoutOwnerInputSchema: z.ZodType<Prisma.SharedAccessUpdateWithWhereUniqueWithoutOwnerInput> = z.object({
+  where: z.lazy(() => SharedAccessWhereUniqueInputSchema),
+  data: z.union([ z.lazy(() => SharedAccessUpdateWithoutOwnerInputSchema),z.lazy(() => SharedAccessUncheckedUpdateWithoutOwnerInputSchema) ]),
+}).strict();
+
+export const SharedAccessUpdateManyWithWhereWithoutOwnerInputSchema: z.ZodType<Prisma.SharedAccessUpdateManyWithWhereWithoutOwnerInput> = z.object({
+  where: z.lazy(() => SharedAccessScalarWhereInputSchema),
+  data: z.union([ z.lazy(() => SharedAccessUpdateManyMutationInputSchema),z.lazy(() => SharedAccessUncheckedUpdateManyWithoutOwnerInputSchema) ]),
+}).strict();
+
+export const SharedAccessScalarWhereInputSchema: z.ZodType<Prisma.SharedAccessScalarWhereInput> = z.object({
+  AND: z.union([ z.lazy(() => SharedAccessScalarWhereInputSchema),z.lazy(() => SharedAccessScalarWhereInputSchema).array() ]).optional(),
+  OR: z.lazy(() => SharedAccessScalarWhereInputSchema).array().optional(),
+  NOT: z.union([ z.lazy(() => SharedAccessScalarWhereInputSchema),z.lazy(() => SharedAccessScalarWhereInputSchema).array() ]).optional(),
+  id: z.union([ z.lazy(() => StringFilterSchema),z.string() ]).optional(),
+  ownerId: z.union([ z.lazy(() => StringFilterSchema),z.string() ]).optional(),
+  viewerEmail: z.union([ z.lazy(() => StringFilterSchema),z.string() ]).optional(),
+  viewerId: z.union([ z.lazy(() => StringNullableFilterSchema),z.string() ]).optional().nullable(),
+  scope: z.union([ z.lazy(() => EnumSharedAccessScopeFilterSchema),z.lazy(() => SharedAccessScopeSchema) ]).optional(),
+  createdAt: z.union([ z.lazy(() => DateTimeFilterSchema),z.coerce.date() ]).optional(),
+}).strict();
+
+export const SharedAccessUpsertWithWhereUniqueWithoutViewerInputSchema: z.ZodType<Prisma.SharedAccessUpsertWithWhereUniqueWithoutViewerInput> = z.object({
+  where: z.lazy(() => SharedAccessWhereUniqueInputSchema),
+  update: z.union([ z.lazy(() => SharedAccessUpdateWithoutViewerInputSchema),z.lazy(() => SharedAccessUncheckedUpdateWithoutViewerInputSchema) ]),
+  create: z.union([ z.lazy(() => SharedAccessCreateWithoutViewerInputSchema),z.lazy(() => SharedAccessUncheckedCreateWithoutViewerInputSchema) ]),
+}).strict();
+
+export const SharedAccessUpdateWithWhereUniqueWithoutViewerInputSchema: z.ZodType<Prisma.SharedAccessUpdateWithWhereUniqueWithoutViewerInput> = z.object({
+  where: z.lazy(() => SharedAccessWhereUniqueInputSchema),
+  data: z.union([ z.lazy(() => SharedAccessUpdateWithoutViewerInputSchema),z.lazy(() => SharedAccessUncheckedUpdateWithoutViewerInputSchema) ]),
+}).strict();
+
+export const SharedAccessUpdateManyWithWhereWithoutViewerInputSchema: z.ZodType<Prisma.SharedAccessUpdateManyWithWhereWithoutViewerInput> = z.object({
+  where: z.lazy(() => SharedAccessScalarWhereInputSchema),
+  data: z.union([ z.lazy(() => SharedAccessUpdateManyMutationInputSchema),z.lazy(() => SharedAccessUncheckedUpdateManyWithoutViewerInputSchema) ]),
+}).strict();
+
 export const UserCreateWithoutAccountsInputSchema: z.ZodType<Prisma.UserCreateWithoutAccountsInput> = z.object({
   id: z.string().cuid2().optional(),
   name: z.string().optional().nullable(),
@@ -7583,7 +8112,9 @@ export const UserCreateWithoutAccountsInputSchema: z.ZodType<Prisma.UserCreateWi
   exerciseSplits: z.lazy(() => ExerciseSplitCreateNestedManyWithoutUserInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleCreateNestedManyWithoutUserInputSchema).optional(),
   workouts: z.lazy(() => WorkoutCreateNestedManyWithoutUserInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsCreateNestedOneWithoutUserInputSchema).optional()
+  settings: z.lazy(() => UserSettingsCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessCreateNestedManyWithoutOwnerInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessCreateNestedManyWithoutViewerInputSchema).optional()
 }).strict();
 
 export const UserUncheckedCreateWithoutAccountsInputSchema: z.ZodType<Prisma.UserUncheckedCreateWithoutAccountsInput> = z.object({
@@ -7599,7 +8130,9 @@ export const UserUncheckedCreateWithoutAccountsInputSchema: z.ZodType<Prisma.Use
   exerciseSplits: z.lazy(() => ExerciseSplitUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
   workouts: z.lazy(() => WorkoutUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUncheckedCreateNestedOneWithoutUserInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUncheckedCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutOwnerInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutViewerInputSchema).optional()
 }).strict();
 
 export const UserCreateOrConnectWithoutAccountsInputSchema: z.ZodType<Prisma.UserCreateOrConnectWithoutAccountsInput> = z.object({
@@ -7631,7 +8164,9 @@ export const UserUpdateWithoutAccountsInputSchema: z.ZodType<Prisma.UserUpdateWi
   exerciseSplits: z.lazy(() => ExerciseSplitUpdateManyWithoutUserNestedInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUpdateManyWithoutUserNestedInputSchema).optional(),
   workouts: z.lazy(() => WorkoutUpdateManyWithoutUserNestedInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUpdateOneWithoutUserNestedInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUpdateManyWithoutOwnerNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUpdateManyWithoutViewerNestedInputSchema).optional()
 }).strict();
 
 export const UserUncheckedUpdateWithoutAccountsInputSchema: z.ZodType<Prisma.UserUncheckedUpdateWithoutAccountsInput> = z.object({
@@ -7647,7 +8182,9 @@ export const UserUncheckedUpdateWithoutAccountsInputSchema: z.ZodType<Prisma.Use
   exerciseSplits: z.lazy(() => ExerciseSplitUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
   workouts: z.lazy(() => WorkoutUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUncheckedUpdateOneWithoutUserNestedInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUncheckedUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutOwnerNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutViewerNestedInputSchema).optional()
 }).strict();
 
 export const UserCreateWithoutSessionsInputSchema: z.ZodType<Prisma.UserCreateWithoutSessionsInput> = z.object({
@@ -7663,7 +8200,9 @@ export const UserCreateWithoutSessionsInputSchema: z.ZodType<Prisma.UserCreateWi
   exerciseSplits: z.lazy(() => ExerciseSplitCreateNestedManyWithoutUserInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleCreateNestedManyWithoutUserInputSchema).optional(),
   workouts: z.lazy(() => WorkoutCreateNestedManyWithoutUserInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsCreateNestedOneWithoutUserInputSchema).optional()
+  settings: z.lazy(() => UserSettingsCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessCreateNestedManyWithoutOwnerInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessCreateNestedManyWithoutViewerInputSchema).optional()
 }).strict();
 
 export const UserUncheckedCreateWithoutSessionsInputSchema: z.ZodType<Prisma.UserUncheckedCreateWithoutSessionsInput> = z.object({
@@ -7679,7 +8218,9 @@ export const UserUncheckedCreateWithoutSessionsInputSchema: z.ZodType<Prisma.Use
   exerciseSplits: z.lazy(() => ExerciseSplitUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
   workouts: z.lazy(() => WorkoutUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUncheckedCreateNestedOneWithoutUserInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUncheckedCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutOwnerInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutViewerInputSchema).optional()
 }).strict();
 
 export const UserCreateOrConnectWithoutSessionsInputSchema: z.ZodType<Prisma.UserCreateOrConnectWithoutSessionsInput> = z.object({
@@ -7711,7 +8252,9 @@ export const UserUpdateWithoutSessionsInputSchema: z.ZodType<Prisma.UserUpdateWi
   exerciseSplits: z.lazy(() => ExerciseSplitUpdateManyWithoutUserNestedInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUpdateManyWithoutUserNestedInputSchema).optional(),
   workouts: z.lazy(() => WorkoutUpdateManyWithoutUserNestedInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUpdateOneWithoutUserNestedInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUpdateManyWithoutOwnerNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUpdateManyWithoutViewerNestedInputSchema).optional()
 }).strict();
 
 export const UserUncheckedUpdateWithoutSessionsInputSchema: z.ZodType<Prisma.UserUncheckedUpdateWithoutSessionsInput> = z.object({
@@ -7727,7 +8270,9 @@ export const UserUncheckedUpdateWithoutSessionsInputSchema: z.ZodType<Prisma.Use
   exerciseSplits: z.lazy(() => ExerciseSplitUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
   workouts: z.lazy(() => WorkoutUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUncheckedUpdateOneWithoutUserNestedInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUncheckedUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutOwnerNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutViewerNestedInputSchema).optional()
 }).strict();
 
 export const UserCreateWithoutSettingsInputSchema: z.ZodType<Prisma.UserCreateWithoutSettingsInput> = z.object({
@@ -7743,7 +8288,9 @@ export const UserCreateWithoutSettingsInputSchema: z.ZodType<Prisma.UserCreateWi
   sessions: z.lazy(() => SessionCreateNestedManyWithoutUserInputSchema).optional(),
   exerciseSplits: z.lazy(() => ExerciseSplitCreateNestedManyWithoutUserInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleCreateNestedManyWithoutUserInputSchema).optional(),
-  workouts: z.lazy(() => WorkoutCreateNestedManyWithoutUserInputSchema).optional()
+  workouts: z.lazy(() => WorkoutCreateNestedManyWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessCreateNestedManyWithoutOwnerInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessCreateNestedManyWithoutViewerInputSchema).optional()
 }).strict();
 
 export const UserUncheckedCreateWithoutSettingsInputSchema: z.ZodType<Prisma.UserUncheckedCreateWithoutSettingsInput> = z.object({
@@ -7759,7 +8306,9 @@ export const UserUncheckedCreateWithoutSettingsInputSchema: z.ZodType<Prisma.Use
   sessions: z.lazy(() => SessionUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
   exerciseSplits: z.lazy(() => ExerciseSplitUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
-  workouts: z.lazy(() => WorkoutUncheckedCreateNestedManyWithoutUserInputSchema).optional()
+  workouts: z.lazy(() => WorkoutUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutOwnerInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutViewerInputSchema).optional()
 }).strict();
 
 export const UserCreateOrConnectWithoutSettingsInputSchema: z.ZodType<Prisma.UserCreateOrConnectWithoutSettingsInput> = z.object({
@@ -7791,7 +8340,9 @@ export const UserUpdateWithoutSettingsInputSchema: z.ZodType<Prisma.UserUpdateWi
   sessions: z.lazy(() => SessionUpdateManyWithoutUserNestedInputSchema).optional(),
   exerciseSplits: z.lazy(() => ExerciseSplitUpdateManyWithoutUserNestedInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUpdateManyWithoutUserNestedInputSchema).optional(),
-  workouts: z.lazy(() => WorkoutUpdateManyWithoutUserNestedInputSchema).optional()
+  workouts: z.lazy(() => WorkoutUpdateManyWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUpdateManyWithoutOwnerNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUpdateManyWithoutViewerNestedInputSchema).optional()
 }).strict();
 
 export const UserUncheckedUpdateWithoutSettingsInputSchema: z.ZodType<Prisma.UserUncheckedUpdateWithoutSettingsInput> = z.object({
@@ -7807,7 +8358,185 @@ export const UserUncheckedUpdateWithoutSettingsInputSchema: z.ZodType<Prisma.Use
   sessions: z.lazy(() => SessionUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
   exerciseSplits: z.lazy(() => ExerciseSplitUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
-  workouts: z.lazy(() => WorkoutUncheckedUpdateManyWithoutUserNestedInputSchema).optional()
+  workouts: z.lazy(() => WorkoutUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutOwnerNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutViewerNestedInputSchema).optional()
+}).strict();
+
+export const UserCreateWithoutSharesGrantedInputSchema: z.ZodType<Prisma.UserCreateWithoutSharesGrantedInput> = z.object({
+  id: z.string().cuid2().optional(),
+  name: z.string().optional().nullable(),
+  email: z.string(),
+  emailVerified: z.coerce.date().optional().nullable(),
+  image: z.string().optional().nullable(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+  migratedFromV2: z.boolean().optional().nullable(),
+  accounts: z.lazy(() => AccountCreateNestedManyWithoutUserInputSchema).optional(),
+  sessions: z.lazy(() => SessionCreateNestedManyWithoutUserInputSchema).optional(),
+  exerciseSplits: z.lazy(() => ExerciseSplitCreateNestedManyWithoutUserInputSchema).optional(),
+  mesocycles: z.lazy(() => MesocycleCreateNestedManyWithoutUserInputSchema).optional(),
+  workouts: z.lazy(() => WorkoutCreateNestedManyWithoutUserInputSchema).optional(),
+  settings: z.lazy(() => UserSettingsCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessCreateNestedManyWithoutViewerInputSchema).optional()
+}).strict();
+
+export const UserUncheckedCreateWithoutSharesGrantedInputSchema: z.ZodType<Prisma.UserUncheckedCreateWithoutSharesGrantedInput> = z.object({
+  id: z.string().cuid2().optional(),
+  name: z.string().optional().nullable(),
+  email: z.string(),
+  emailVerified: z.coerce.date().optional().nullable(),
+  image: z.string().optional().nullable(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+  migratedFromV2: z.boolean().optional().nullable(),
+  accounts: z.lazy(() => AccountUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
+  sessions: z.lazy(() => SessionUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
+  exerciseSplits: z.lazy(() => ExerciseSplitUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
+  mesocycles: z.lazy(() => MesocycleUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
+  workouts: z.lazy(() => WorkoutUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
+  settings: z.lazy(() => UserSettingsUncheckedCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutViewerInputSchema).optional()
+}).strict();
+
+export const UserCreateOrConnectWithoutSharesGrantedInputSchema: z.ZodType<Prisma.UserCreateOrConnectWithoutSharesGrantedInput> = z.object({
+  where: z.lazy(() => UserWhereUniqueInputSchema),
+  create: z.union([ z.lazy(() => UserCreateWithoutSharesGrantedInputSchema),z.lazy(() => UserUncheckedCreateWithoutSharesGrantedInputSchema) ]),
+}).strict();
+
+export const UserCreateWithoutSharesReceivedInputSchema: z.ZodType<Prisma.UserCreateWithoutSharesReceivedInput> = z.object({
+  id: z.string().cuid2().optional(),
+  name: z.string().optional().nullable(),
+  email: z.string(),
+  emailVerified: z.coerce.date().optional().nullable(),
+  image: z.string().optional().nullable(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+  migratedFromV2: z.boolean().optional().nullable(),
+  accounts: z.lazy(() => AccountCreateNestedManyWithoutUserInputSchema).optional(),
+  sessions: z.lazy(() => SessionCreateNestedManyWithoutUserInputSchema).optional(),
+  exerciseSplits: z.lazy(() => ExerciseSplitCreateNestedManyWithoutUserInputSchema).optional(),
+  mesocycles: z.lazy(() => MesocycleCreateNestedManyWithoutUserInputSchema).optional(),
+  workouts: z.lazy(() => WorkoutCreateNestedManyWithoutUserInputSchema).optional(),
+  settings: z.lazy(() => UserSettingsCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessCreateNestedManyWithoutOwnerInputSchema).optional()
+}).strict();
+
+export const UserUncheckedCreateWithoutSharesReceivedInputSchema: z.ZodType<Prisma.UserUncheckedCreateWithoutSharesReceivedInput> = z.object({
+  id: z.string().cuid2().optional(),
+  name: z.string().optional().nullable(),
+  email: z.string(),
+  emailVerified: z.coerce.date().optional().nullable(),
+  image: z.string().optional().nullable(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+  migratedFromV2: z.boolean().optional().nullable(),
+  accounts: z.lazy(() => AccountUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
+  sessions: z.lazy(() => SessionUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
+  exerciseSplits: z.lazy(() => ExerciseSplitUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
+  mesocycles: z.lazy(() => MesocycleUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
+  workouts: z.lazy(() => WorkoutUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
+  settings: z.lazy(() => UserSettingsUncheckedCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutOwnerInputSchema).optional()
+}).strict();
+
+export const UserCreateOrConnectWithoutSharesReceivedInputSchema: z.ZodType<Prisma.UserCreateOrConnectWithoutSharesReceivedInput> = z.object({
+  where: z.lazy(() => UserWhereUniqueInputSchema),
+  create: z.union([ z.lazy(() => UserCreateWithoutSharesReceivedInputSchema),z.lazy(() => UserUncheckedCreateWithoutSharesReceivedInputSchema) ]),
+}).strict();
+
+export const UserUpsertWithoutSharesGrantedInputSchema: z.ZodType<Prisma.UserUpsertWithoutSharesGrantedInput> = z.object({
+  update: z.union([ z.lazy(() => UserUpdateWithoutSharesGrantedInputSchema),z.lazy(() => UserUncheckedUpdateWithoutSharesGrantedInputSchema) ]),
+  create: z.union([ z.lazy(() => UserCreateWithoutSharesGrantedInputSchema),z.lazy(() => UserUncheckedCreateWithoutSharesGrantedInputSchema) ]),
+  where: z.lazy(() => UserWhereInputSchema).optional()
+}).strict();
+
+export const UserUpdateToOneWithWhereWithoutSharesGrantedInputSchema: z.ZodType<Prisma.UserUpdateToOneWithWhereWithoutSharesGrantedInput> = z.object({
+  where: z.lazy(() => UserWhereInputSchema).optional(),
+  data: z.union([ z.lazy(() => UserUpdateWithoutSharesGrantedInputSchema),z.lazy(() => UserUncheckedUpdateWithoutSharesGrantedInputSchema) ]),
+}).strict();
+
+export const UserUpdateWithoutSharesGrantedInputSchema: z.ZodType<Prisma.UserUpdateWithoutSharesGrantedInput> = z.object({
+  id: z.union([ z.string().cuid2(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  name: z.union([ z.string(),z.lazy(() => NullableStringFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  email: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  emailVerified: z.union([ z.coerce.date(),z.lazy(() => NullableDateTimeFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  image: z.union([ z.string(),z.lazy(() => NullableStringFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  migratedFromV2: z.union([ z.boolean(),z.lazy(() => NullableBoolFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  accounts: z.lazy(() => AccountUpdateManyWithoutUserNestedInputSchema).optional(),
+  sessions: z.lazy(() => SessionUpdateManyWithoutUserNestedInputSchema).optional(),
+  exerciseSplits: z.lazy(() => ExerciseSplitUpdateManyWithoutUserNestedInputSchema).optional(),
+  mesocycles: z.lazy(() => MesocycleUpdateManyWithoutUserNestedInputSchema).optional(),
+  workouts: z.lazy(() => WorkoutUpdateManyWithoutUserNestedInputSchema).optional(),
+  settings: z.lazy(() => UserSettingsUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUpdateManyWithoutViewerNestedInputSchema).optional()
+}).strict();
+
+export const UserUncheckedUpdateWithoutSharesGrantedInputSchema: z.ZodType<Prisma.UserUncheckedUpdateWithoutSharesGrantedInput> = z.object({
+  id: z.union([ z.string().cuid2(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  name: z.union([ z.string(),z.lazy(() => NullableStringFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  email: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  emailVerified: z.union([ z.coerce.date(),z.lazy(() => NullableDateTimeFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  image: z.union([ z.string(),z.lazy(() => NullableStringFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  migratedFromV2: z.union([ z.boolean(),z.lazy(() => NullableBoolFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  accounts: z.lazy(() => AccountUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
+  sessions: z.lazy(() => SessionUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
+  exerciseSplits: z.lazy(() => ExerciseSplitUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
+  mesocycles: z.lazy(() => MesocycleUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
+  workouts: z.lazy(() => WorkoutUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
+  settings: z.lazy(() => UserSettingsUncheckedUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutViewerNestedInputSchema).optional()
+}).strict();
+
+export const UserUpsertWithoutSharesReceivedInputSchema: z.ZodType<Prisma.UserUpsertWithoutSharesReceivedInput> = z.object({
+  update: z.union([ z.lazy(() => UserUpdateWithoutSharesReceivedInputSchema),z.lazy(() => UserUncheckedUpdateWithoutSharesReceivedInputSchema) ]),
+  create: z.union([ z.lazy(() => UserCreateWithoutSharesReceivedInputSchema),z.lazy(() => UserUncheckedCreateWithoutSharesReceivedInputSchema) ]),
+  where: z.lazy(() => UserWhereInputSchema).optional()
+}).strict();
+
+export const UserUpdateToOneWithWhereWithoutSharesReceivedInputSchema: z.ZodType<Prisma.UserUpdateToOneWithWhereWithoutSharesReceivedInput> = z.object({
+  where: z.lazy(() => UserWhereInputSchema).optional(),
+  data: z.union([ z.lazy(() => UserUpdateWithoutSharesReceivedInputSchema),z.lazy(() => UserUncheckedUpdateWithoutSharesReceivedInputSchema) ]),
+}).strict();
+
+export const UserUpdateWithoutSharesReceivedInputSchema: z.ZodType<Prisma.UserUpdateWithoutSharesReceivedInput> = z.object({
+  id: z.union([ z.string().cuid2(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  name: z.union([ z.string(),z.lazy(() => NullableStringFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  email: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  emailVerified: z.union([ z.coerce.date(),z.lazy(() => NullableDateTimeFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  image: z.union([ z.string(),z.lazy(() => NullableStringFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  migratedFromV2: z.union([ z.boolean(),z.lazy(() => NullableBoolFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  accounts: z.lazy(() => AccountUpdateManyWithoutUserNestedInputSchema).optional(),
+  sessions: z.lazy(() => SessionUpdateManyWithoutUserNestedInputSchema).optional(),
+  exerciseSplits: z.lazy(() => ExerciseSplitUpdateManyWithoutUserNestedInputSchema).optional(),
+  mesocycles: z.lazy(() => MesocycleUpdateManyWithoutUserNestedInputSchema).optional(),
+  workouts: z.lazy(() => WorkoutUpdateManyWithoutUserNestedInputSchema).optional(),
+  settings: z.lazy(() => UserSettingsUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUpdateManyWithoutOwnerNestedInputSchema).optional()
+}).strict();
+
+export const UserUncheckedUpdateWithoutSharesReceivedInputSchema: z.ZodType<Prisma.UserUncheckedUpdateWithoutSharesReceivedInput> = z.object({
+  id: z.union([ z.string().cuid2(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  name: z.union([ z.string(),z.lazy(() => NullableStringFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  email: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  emailVerified: z.union([ z.coerce.date(),z.lazy(() => NullableDateTimeFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  image: z.union([ z.string(),z.lazy(() => NullableStringFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  updatedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  migratedFromV2: z.union([ z.boolean(),z.lazy(() => NullableBoolFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  accounts: z.lazy(() => AccountUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
+  sessions: z.lazy(() => SessionUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
+  exerciseSplits: z.lazy(() => ExerciseSplitUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
+  mesocycles: z.lazy(() => MesocycleUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
+  workouts: z.lazy(() => WorkoutUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
+  settings: z.lazy(() => UserSettingsUncheckedUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutOwnerNestedInputSchema).optional()
 }).strict();
 
 export const WorkoutCreateWithoutWorkoutOfMesocycleInputSchema: z.ZodType<Prisma.WorkoutCreateWithoutWorkoutOfMesocycleInput> = z.object({
@@ -7955,7 +8684,9 @@ export const UserCreateWithoutWorkoutsInputSchema: z.ZodType<Prisma.UserCreateWi
   sessions: z.lazy(() => SessionCreateNestedManyWithoutUserInputSchema).optional(),
   exerciseSplits: z.lazy(() => ExerciseSplitCreateNestedManyWithoutUserInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleCreateNestedManyWithoutUserInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsCreateNestedOneWithoutUserInputSchema).optional()
+  settings: z.lazy(() => UserSettingsCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessCreateNestedManyWithoutOwnerInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessCreateNestedManyWithoutViewerInputSchema).optional()
 }).strict();
 
 export const UserUncheckedCreateWithoutWorkoutsInputSchema: z.ZodType<Prisma.UserUncheckedCreateWithoutWorkoutsInput> = z.object({
@@ -7971,7 +8702,9 @@ export const UserUncheckedCreateWithoutWorkoutsInputSchema: z.ZodType<Prisma.Use
   sessions: z.lazy(() => SessionUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
   exerciseSplits: z.lazy(() => ExerciseSplitUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUncheckedCreateNestedManyWithoutUserInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUncheckedCreateNestedOneWithoutUserInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUncheckedCreateNestedOneWithoutUserInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutOwnerInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedCreateNestedManyWithoutViewerInputSchema).optional()
 }).strict();
 
 export const UserCreateOrConnectWithoutWorkoutsInputSchema: z.ZodType<Prisma.UserCreateOrConnectWithoutWorkoutsInput> = z.object({
@@ -8076,7 +8809,9 @@ export const UserUpdateWithoutWorkoutsInputSchema: z.ZodType<Prisma.UserUpdateWi
   sessions: z.lazy(() => SessionUpdateManyWithoutUserNestedInputSchema).optional(),
   exerciseSplits: z.lazy(() => ExerciseSplitUpdateManyWithoutUserNestedInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUpdateManyWithoutUserNestedInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUpdateOneWithoutUserNestedInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUpdateManyWithoutOwnerNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUpdateManyWithoutViewerNestedInputSchema).optional()
 }).strict();
 
 export const UserUncheckedUpdateWithoutWorkoutsInputSchema: z.ZodType<Prisma.UserUncheckedUpdateWithoutWorkoutsInput> = z.object({
@@ -8092,7 +8827,9 @@ export const UserUncheckedUpdateWithoutWorkoutsInputSchema: z.ZodType<Prisma.Use
   sessions: z.lazy(() => SessionUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
   exerciseSplits: z.lazy(() => ExerciseSplitUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
   mesocycles: z.lazy(() => MesocycleUncheckedUpdateManyWithoutUserNestedInputSchema).optional(),
-  settings: z.lazy(() => UserSettingsUncheckedUpdateOneWithoutUserNestedInputSchema).optional()
+  settings: z.lazy(() => UserSettingsUncheckedUpdateOneWithoutUserNestedInputSchema).optional(),
+  sharesGranted: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutOwnerNestedInputSchema).optional(),
+  sharesReceived: z.lazy(() => SharedAccessUncheckedUpdateManyWithoutViewerNestedInputSchema).optional()
 }).strict();
 
 export const WorkoutOfMesocycleUpsertWithoutWorkoutInputSchema: z.ZodType<Prisma.WorkoutOfMesocycleUpsertWithoutWorkoutInput> = z.object({
@@ -8871,6 +9608,22 @@ export const WorkoutCreateManyUserInputSchema: z.ZodType<Prisma.WorkoutCreateMan
   note: z.string().optional().nullable()
 }).strict();
 
+export const SharedAccessCreateManyOwnerInputSchema: z.ZodType<Prisma.SharedAccessCreateManyOwnerInput> = z.object({
+  id: z.string().cuid2().optional(),
+  viewerEmail: z.string(),
+  viewerId: z.string().optional().nullable(),
+  scope: z.lazy(() => SharedAccessScopeSchema).optional(),
+  createdAt: z.coerce.date().optional()
+}).strict();
+
+export const SharedAccessCreateManyViewerInputSchema: z.ZodType<Prisma.SharedAccessCreateManyViewerInput> = z.object({
+  id: z.string().cuid2().optional(),
+  ownerId: z.string(),
+  viewerEmail: z.string(),
+  scope: z.lazy(() => SharedAccessScopeSchema).optional(),
+  createdAt: z.coerce.date().optional()
+}).strict();
+
 export const AccountUpdateWithoutUserInputSchema: z.ZodType<Prisma.AccountUpdateWithoutUserInput> = z.object({
   type: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
   provider: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
@@ -9024,6 +9777,54 @@ export const WorkoutUncheckedUpdateManyWithoutUserInputSchema: z.ZodType<Prisma.
   startedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
   endedAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
   note: z.union([ z.string(),z.lazy(() => NullableStringFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+}).strict();
+
+export const SharedAccessUpdateWithoutOwnerInputSchema: z.ZodType<Prisma.SharedAccessUpdateWithoutOwnerInput> = z.object({
+  id: z.union([ z.string().cuid2(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  viewerEmail: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  scope: z.union([ z.lazy(() => SharedAccessScopeSchema),z.lazy(() => EnumSharedAccessScopeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  viewer: z.lazy(() => UserUpdateOneWithoutSharesReceivedNestedInputSchema).optional()
+}).strict();
+
+export const SharedAccessUncheckedUpdateWithoutOwnerInputSchema: z.ZodType<Prisma.SharedAccessUncheckedUpdateWithoutOwnerInput> = z.object({
+  id: z.union([ z.string().cuid2(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  viewerEmail: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  viewerId: z.union([ z.string(),z.lazy(() => NullableStringFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  scope: z.union([ z.lazy(() => SharedAccessScopeSchema),z.lazy(() => EnumSharedAccessScopeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+}).strict();
+
+export const SharedAccessUncheckedUpdateManyWithoutOwnerInputSchema: z.ZodType<Prisma.SharedAccessUncheckedUpdateManyWithoutOwnerInput> = z.object({
+  id: z.union([ z.string().cuid2(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  viewerEmail: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  viewerId: z.union([ z.string(),z.lazy(() => NullableStringFieldUpdateOperationsInputSchema) ]).optional().nullable(),
+  scope: z.union([ z.lazy(() => SharedAccessScopeSchema),z.lazy(() => EnumSharedAccessScopeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+}).strict();
+
+export const SharedAccessUpdateWithoutViewerInputSchema: z.ZodType<Prisma.SharedAccessUpdateWithoutViewerInput> = z.object({
+  id: z.union([ z.string().cuid2(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  viewerEmail: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  scope: z.union([ z.lazy(() => SharedAccessScopeSchema),z.lazy(() => EnumSharedAccessScopeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+  owner: z.lazy(() => UserUpdateOneRequiredWithoutSharesGrantedNestedInputSchema).optional()
+}).strict();
+
+export const SharedAccessUncheckedUpdateWithoutViewerInputSchema: z.ZodType<Prisma.SharedAccessUncheckedUpdateWithoutViewerInput> = z.object({
+  id: z.union([ z.string().cuid2(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  ownerId: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  viewerEmail: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  scope: z.union([ z.lazy(() => SharedAccessScopeSchema),z.lazy(() => EnumSharedAccessScopeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
+}).strict();
+
+export const SharedAccessUncheckedUpdateManyWithoutViewerInputSchema: z.ZodType<Prisma.SharedAccessUncheckedUpdateManyWithoutViewerInput> = z.object({
+  id: z.union([ z.string().cuid2(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  ownerId: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  viewerEmail: z.union([ z.string(),z.lazy(() => StringFieldUpdateOperationsInputSchema) ]).optional(),
+  scope: z.union([ z.lazy(() => SharedAccessScopeSchema),z.lazy(() => EnumSharedAccessScopeFieldUpdateOperationsInputSchema) ]).optional(),
+  createdAt: z.union([ z.coerce.date(),z.lazy(() => DateTimeFieldUpdateOperationsInputSchema) ]).optional(),
 }).strict();
 
 export const WorkoutExerciseCreateManyWorkoutInputSchema: z.ZodType<Prisma.WorkoutExerciseCreateManyWorkoutInput> = z.object({
@@ -9925,6 +10726,68 @@ export const UserSettingsFindUniqueOrThrowArgsSchema: z.ZodType<Prisma.UserSetti
   where: UserSettingsWhereUniqueInputSchema,
 }).strict() ;
 
+export const SharedAccessFindFirstArgsSchema: z.ZodType<Prisma.SharedAccessFindFirstArgs> = z.object({
+  select: SharedAccessSelectSchema.optional(),
+  include: SharedAccessIncludeSchema.optional(),
+  where: SharedAccessWhereInputSchema.optional(),
+  orderBy: z.union([ SharedAccessOrderByWithRelationInputSchema.array(),SharedAccessOrderByWithRelationInputSchema ]).optional(),
+  cursor: SharedAccessWhereUniqueInputSchema.optional(),
+  take: z.number().optional(),
+  skip: z.number().optional(),
+  distinct: z.union([ SharedAccessScalarFieldEnumSchema,SharedAccessScalarFieldEnumSchema.array() ]).optional(),
+}).strict() ;
+
+export const SharedAccessFindFirstOrThrowArgsSchema: z.ZodType<Prisma.SharedAccessFindFirstOrThrowArgs> = z.object({
+  select: SharedAccessSelectSchema.optional(),
+  include: SharedAccessIncludeSchema.optional(),
+  where: SharedAccessWhereInputSchema.optional(),
+  orderBy: z.union([ SharedAccessOrderByWithRelationInputSchema.array(),SharedAccessOrderByWithRelationInputSchema ]).optional(),
+  cursor: SharedAccessWhereUniqueInputSchema.optional(),
+  take: z.number().optional(),
+  skip: z.number().optional(),
+  distinct: z.union([ SharedAccessScalarFieldEnumSchema,SharedAccessScalarFieldEnumSchema.array() ]).optional(),
+}).strict() ;
+
+export const SharedAccessFindManyArgsSchema: z.ZodType<Prisma.SharedAccessFindManyArgs> = z.object({
+  select: SharedAccessSelectSchema.optional(),
+  include: SharedAccessIncludeSchema.optional(),
+  where: SharedAccessWhereInputSchema.optional(),
+  orderBy: z.union([ SharedAccessOrderByWithRelationInputSchema.array(),SharedAccessOrderByWithRelationInputSchema ]).optional(),
+  cursor: SharedAccessWhereUniqueInputSchema.optional(),
+  take: z.number().optional(),
+  skip: z.number().optional(),
+  distinct: z.union([ SharedAccessScalarFieldEnumSchema,SharedAccessScalarFieldEnumSchema.array() ]).optional(),
+}).strict() ;
+
+export const SharedAccessAggregateArgsSchema: z.ZodType<Prisma.SharedAccessAggregateArgs> = z.object({
+  where: SharedAccessWhereInputSchema.optional(),
+  orderBy: z.union([ SharedAccessOrderByWithRelationInputSchema.array(),SharedAccessOrderByWithRelationInputSchema ]).optional(),
+  cursor: SharedAccessWhereUniqueInputSchema.optional(),
+  take: z.number().optional(),
+  skip: z.number().optional(),
+}).strict() ;
+
+export const SharedAccessGroupByArgsSchema: z.ZodType<Prisma.SharedAccessGroupByArgs> = z.object({
+  where: SharedAccessWhereInputSchema.optional(),
+  orderBy: z.union([ SharedAccessOrderByWithAggregationInputSchema.array(),SharedAccessOrderByWithAggregationInputSchema ]).optional(),
+  by: SharedAccessScalarFieldEnumSchema.array(),
+  having: SharedAccessScalarWhereWithAggregatesInputSchema.optional(),
+  take: z.number().optional(),
+  skip: z.number().optional(),
+}).strict() ;
+
+export const SharedAccessFindUniqueArgsSchema: z.ZodType<Prisma.SharedAccessFindUniqueArgs> = z.object({
+  select: SharedAccessSelectSchema.optional(),
+  include: SharedAccessIncludeSchema.optional(),
+  where: SharedAccessWhereUniqueInputSchema,
+}).strict() ;
+
+export const SharedAccessFindUniqueOrThrowArgsSchema: z.ZodType<Prisma.SharedAccessFindUniqueOrThrowArgs> = z.object({
+  select: SharedAccessSelectSchema.optional(),
+  include: SharedAccessIncludeSchema.optional(),
+  where: SharedAccessWhereUniqueInputSchema,
+}).strict() ;
+
 export const WorkoutOfMesocycleFindFirstArgsSchema: z.ZodType<Prisma.WorkoutOfMesocycleFindFirstArgs> = z.object({
   select: WorkoutOfMesocycleSelectSchema.optional(),
   include: WorkoutOfMesocycleIncludeSchema.optional(),
@@ -10781,6 +11644,52 @@ export const UserSettingsUpdateManyArgsSchema: z.ZodType<Prisma.UserSettingsUpda
 
 export const UserSettingsDeleteManyArgsSchema: z.ZodType<Prisma.UserSettingsDeleteManyArgs> = z.object({
   where: UserSettingsWhereInputSchema.optional(),
+}).strict() ;
+
+export const SharedAccessCreateArgsSchema: z.ZodType<Prisma.SharedAccessCreateArgs> = z.object({
+  select: SharedAccessSelectSchema.optional(),
+  include: SharedAccessIncludeSchema.optional(),
+  data: z.union([ SharedAccessCreateInputSchema,SharedAccessUncheckedCreateInputSchema ]),
+}).strict() ;
+
+export const SharedAccessUpsertArgsSchema: z.ZodType<Prisma.SharedAccessUpsertArgs> = z.object({
+  select: SharedAccessSelectSchema.optional(),
+  include: SharedAccessIncludeSchema.optional(),
+  where: SharedAccessWhereUniqueInputSchema,
+  create: z.union([ SharedAccessCreateInputSchema,SharedAccessUncheckedCreateInputSchema ]),
+  update: z.union([ SharedAccessUpdateInputSchema,SharedAccessUncheckedUpdateInputSchema ]),
+}).strict() ;
+
+export const SharedAccessCreateManyArgsSchema: z.ZodType<Prisma.SharedAccessCreateManyArgs> = z.object({
+  data: z.union([ SharedAccessCreateManyInputSchema,SharedAccessCreateManyInputSchema.array() ]),
+  skipDuplicates: z.boolean().optional(),
+}).strict() ;
+
+export const SharedAccessCreateManyAndReturnArgsSchema: z.ZodType<Prisma.SharedAccessCreateManyAndReturnArgs> = z.object({
+  data: z.union([ SharedAccessCreateManyInputSchema,SharedAccessCreateManyInputSchema.array() ]),
+  skipDuplicates: z.boolean().optional(),
+}).strict() ;
+
+export const SharedAccessDeleteArgsSchema: z.ZodType<Prisma.SharedAccessDeleteArgs> = z.object({
+  select: SharedAccessSelectSchema.optional(),
+  include: SharedAccessIncludeSchema.optional(),
+  where: SharedAccessWhereUniqueInputSchema,
+}).strict() ;
+
+export const SharedAccessUpdateArgsSchema: z.ZodType<Prisma.SharedAccessUpdateArgs> = z.object({
+  select: SharedAccessSelectSchema.optional(),
+  include: SharedAccessIncludeSchema.optional(),
+  data: z.union([ SharedAccessUpdateInputSchema,SharedAccessUncheckedUpdateInputSchema ]),
+  where: SharedAccessWhereUniqueInputSchema,
+}).strict() ;
+
+export const SharedAccessUpdateManyArgsSchema: z.ZodType<Prisma.SharedAccessUpdateManyArgs> = z.object({
+  data: z.union([ SharedAccessUpdateManyMutationInputSchema,SharedAccessUncheckedUpdateManyInputSchema ]),
+  where: SharedAccessWhereInputSchema.optional(),
+}).strict() ;
+
+export const SharedAccessDeleteManyArgsSchema: z.ZodType<Prisma.SharedAccessDeleteManyArgs> = z.object({
+  where: SharedAccessWhereInputSchema.optional(),
 }).strict() ;
 
 export const WorkoutOfMesocycleCreateArgsSchema: z.ZodType<Prisma.WorkoutOfMesocycleCreateArgs> = z.object({

@@ -1,0 +1,128 @@
+{
+  "name": "Example Upper/Lower 4-day",
+  "days": [
+    {
+      "name": "Upper A",
+      "exercises": [
+        {
+          "name": "Barbell Bench Press",
+          "muscle": "Chest"
+        },
+        {
+          "name": "Chest Supported Row",
+          "muscle": "lats"
+        },
+        {
+          "name": "Seated Dumbbell Press",
+          "muscle": "Front Delts"
+        },
+        {
+          "name": "Cable Lateral Raise",
+          "muscle": "side delts"
+        },
+        {
+          "name": "Cable Tricep Pushdown",
+          "muscle": "Triceps"
+        },
+        {
+          "name": "Incline Dumbbell Curl",
+          "muscle": "biceps"
+        }
+      ]
+    },
+    {
+      "name": "Lower A",
+      "exercises": [
+        {
+          "name": "Back Squat",
+          "muscle": "Quads"
+        },
+        {
+          "name": "Romanian Deadlift",
+          "muscle": "Hamstrings"
+        },
+        {
+          "name": "Hip Thrust",
+          "muscle": "Glutes",
+          "repRangeStart": 8,
+          "repRangeEnd": 12
+        },
+        {
+          "name": "Standing Calf Raise",
+          "muscle": "Calves"
+        },
+        {
+          "name": "Cable Crunch",
+          "muscle": "abs"
+        }
+      ]
+    },
+    {
+      "name": "Rest",
+      "isRestDay": true
+    },
+    {
+      "name": "Upper B",
+      "exercises": [
+        {
+          "name": "Incline Dumbbell Press",
+          "muscle": "Chest"
+        },
+        {
+          "name": "Weighted Pull-up",
+          "muscle": "Lats",
+          "bodyweightFraction": 1
+        },
+        {
+          "name": "Reverse Pec Deck",
+          "muscle": "Rear Delts"
+        },
+        {
+          "name": "Overhead Cable Extension",
+          "muscle": "Triceps"
+        },
+        {
+          "name": "Preacher Curl",
+          "muscle": "Biceps"
+        },
+        {
+          "name": "Wrist Curl",
+          "muscle": "grip"
+        }
+      ]
+    },
+    {
+      "name": "Lower B",
+      "exercises": [
+        {
+          "name": "Hack Squat",
+          "muscle": "Quads"
+        },
+        {
+          "name": "Seated Leg Curl",
+          "muscle": "Hamstrings"
+        },
+        {
+          "name": "Bulgarian Split Squat",
+          "muscle": "Glutes"
+        },
+        {
+          "name": "Seated Calf Raise",
+          "muscle": "Calves"
+        },
+        {
+          "name": "Neck Curl",
+          "muscle": "traphezius typo"
+        }
+      ]
+    },
+    {
+      "name": "Rest",
+      "isRestDay": true
+    },
+    {
+      "name": "Rest",
+      "isRestDay": true
+    }
+  ]
+}

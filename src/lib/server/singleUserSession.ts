@@ -3,6 +3,7 @@ import { env } from '$env/dynamic/private';
 import { randomUUID } from 'crypto';
 import type { Cookies } from '@sveltejs/kit';
 import type { User } from '@prisma/client';
+import { bindPendingGrants } from '$lib/server/crewGrants';
 
 export const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 365;
 
@@ -14,12 +15,25 @@ export function sessionCookieName(secure: boolean) {
 // SSO path (email from the verified JWT) and the /login owner fallback. Each
 // distinct email gets its own User row — all workout data is already scoped
 // per userId, so this is all multi-user needs on the auth side.
-export async function getOrCreateUser(email: string, name?: string) {
-	return prisma.user.upsert({
+export async function getOrCreateUser(rawEmail: string, name?: string) {
+	// Normalise before touching the DB. User.email is a case-SENSITIVE unique, so
+	// an identity provider that sends "Sam.Example@Example.com" one day and
+	// "sam.example@example.com" the next would silently create two separate
+	// accounts with two separate training histories. Crew grants are stored
+	// lowercased too, so this is also what makes an invite match its user.
+	const email = rawEmail.trim().toLowerCase();
+
+	const user = await prisma.user.upsert({
 		where: { email },
 		update: {},
 		create: { email, name: name ?? email.split('@')[0] }
 	});
+
+	// Activate any crew grant that was handed out to this email before they had
+	// an account. Idempotent, and the only place it happens.
+	await bindPendingGrants(email, user.id);
+
+	return user;
 }
 
 // The owner identity used by the /login password fallback (break-glass door
