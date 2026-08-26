@@ -35,6 +35,9 @@ try {
 		if (!email?.endsWith(TEST_DOMAIN) && email !== OWNER) {
 			throw new Error(`Refusing: token only mints for ${TEST_DOMAIN} addresses or the owner.`);
 		}
+		// NOTE: Auth.js rotates `expires` to now+30d the first time the cookie is
+		// used, so the 1h below is not what you'll see in the DB afterwards. Find
+		// these by createdAt, not by expiry, when cleaning up.
 		const u = await prisma.user.findUniqueOrThrow({ where: { email } });
 		const sessionToken = randomUUID();
 		await prisma.session.create({ data: { sessionToken, expires: new Date(Date.now() + 3_600_000), userId: u.id } });
