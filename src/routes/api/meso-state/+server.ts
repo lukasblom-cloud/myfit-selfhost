@@ -4,10 +4,11 @@ import { env } from '$env/dynamic/private';
 import { arraySum } from '$lib/utils';
 import { getRIRForWeek } from '$lib/utils/workoutUtils';
 
-// Read-only mesocycle state for the Cotsworth calendar's training overlay.
-// Token-gated (matches Cotsworth's existing VITE_*_API + token pattern) and
-// CORS-opened to the calendar origin plus localhost (see isAllowedOrigin).
-const ALLOWED_ORIGIN = 'https://calendar.example.com';
+// Read-only mesocycle state for the companion calendar's training overlay.
+// Token-gated, and CORS-opened to COTSWORTH_ALLOWED_ORIGIN plus localhost.
+// The calendar's origin, supplied by env so a personal hostname isn't baked
+// into published source. Unset means only localhost gets through CORS.
+const ALLOWED_ORIGIN = env.COTSWORTH_ALLOWED_ORIGIN ?? '';
 
 // Localhost is allowed as well as the deployed calendar. CORS is not the gate
 // here — the token in the query string is, and a non-browser client ignores
@@ -15,13 +16,13 @@ const ALLOWED_ORIGIN = 'https://calendar.example.com';
 // overlay testable from a dev server, which it otherwise is not.
 function isAllowedOrigin(origin: string | null): boolean {
 	if (!origin) return false;
-	if (origin === ALLOWED_ORIGIN) return true;
+	if (ALLOWED_ORIGIN && origin === ALLOWED_ORIGIN) return true;
 	return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
 
 function corsHeaders(origin: string | null) {
 	return {
-		'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin! : ALLOWED_ORIGIN,
+		'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin! : ALLOWED_ORIGIN || 'null',
 		'Vary': 'Origin',
 		'Access-Control-Allow-Methods': 'GET, OPTIONS',
 		'Access-Control-Allow-Headers': 'Authorization'

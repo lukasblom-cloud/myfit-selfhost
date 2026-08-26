@@ -106,8 +106,7 @@
 		Because this is a modified AGPL program you interact with over a network, section 13 of that licence entitles you
 		to the Corresponding Source of <em>this</em> version — not just the original. The modified source lives at
 		<a href="https://github.com/lukasblom-cloud/myfit-selfhost">github.com/lukasblom-cloud/myfit-selfhost</a>
-		(branch <code>selfhost</code>). If that link asks you to sign in, ask the person who invited you here and
-		they'll give you access.
+		(branch <code>selfhost</code>).
 	</p>
 	<p>
 		Modifications on top of upstream: Cloudflare Access single sign-on in place of OAuth providers, multi-user

@@ -18,7 +18,8 @@ import { resolve } from 'node:path';
 config({ path: resolve(import.meta.dirname, '../../.env') });
 
 const TEST_DOMAIN = '@example.invalid';
-const OWNER = process.env.APP_USER_EMAIL?.toLowerCase() ?? 'owner@example.com';
+const OWNER = process.env.APP_USER_EMAIL?.toLowerCase();
+if (!OWNER) throw new Error('APP_USER_EMAIL is not set in .env — needed to identify the owner account.');
 const VIEWER = `crew-test-viewer${TEST_DOMAIN}`;
 const STRANGER = `crew-test-stranger${TEST_DOMAIN}`;
 const PENDING = `crew-test-pending${TEST_DOMAIN}`;

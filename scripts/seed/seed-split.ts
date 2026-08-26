@@ -17,9 +17,10 @@ const args = process.argv.slice(2);
 const file = args.find((a) => !a.startsWith('--'));
 const write = args.includes('--write');
 const userEmail =
-	args[args.indexOf('--user') + 1] && args.includes('--user')
+	args.includes('--user') && args[args.indexOf('--user') + 1]
 		? args[args.indexOf('--user') + 1]
-		: 'owner@example.com';
+		: process.env.APP_USER_EMAIL;
+if (!userEmail) throw new Error('Pass --user <email>, or set APP_USER_EMAIL in .env.');
 
 if (!file) {
 	console.error('Usage: tsx scripts/seed/seed-split.ts <file.json> [--write] [--user <email>]');

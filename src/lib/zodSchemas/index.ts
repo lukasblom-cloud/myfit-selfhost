@@ -309,7 +309,7 @@ export const SharedAccessSchema = z.object({
    * The grant is keyed on EMAIL, not on a User row, so access can be granted
    * to someone who has never logged in. `viewerId` stays null until that email
    * first signs in, at which point getOrCreateUser backfills it. Without this
-   * you could not invite anyone new — which is exactly how an invitee
+   * you could not invite anyone new — which is how an invitee
    * ended up in the allowlist with no way to use it.
    */
   viewerEmail: z.string(),

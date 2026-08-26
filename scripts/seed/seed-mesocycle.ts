@@ -21,7 +21,8 @@ const arg = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1
 const splitName = arg('--split');
 const write = args.includes('--write');
 const startImmediately = args.includes('--start');
-const userEmail = arg('--user') ?? 'owner@example.com';
+const userEmail = arg('--user') ?? process.env.APP_USER_EMAIL;
+if (!userEmail) throw new Error('Pass --user <email>, or set APP_USER_EMAIL in .env.');
 const mesoName = arg('--name');
 const minSets = Number(arg('--min-sets') ?? 2);
 // index = RIR, value = weeks at that RIR. Runs highest-RIR first, so
