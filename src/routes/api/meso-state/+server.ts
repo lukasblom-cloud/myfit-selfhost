@@ -47,6 +47,49 @@ export const GET = async ({ url, request }) => {
 	const owner = await prisma.user.findUnique({ where: { email: ownerEmail }, select: { id: true } });
 	if (!owner) return json({ active: false }, { headers: corsHeaders(origin) });
 
+	const lastWorkout = await prisma.workout.findFirst({
+		where: { userId: owner.id },
+		orderBy: { startedAt: 'desc' },
+		select: { startedAt: true }
+	});
+
+	// Weekly volume. This is what health.lifting_weekly_volume existed to answer;
+	// serving it here instead means the calendar can actually consume it, which
+	// the cross-schema view never made possible (different Supabase project).
+	const weekStart = new Date();
+	weekStart.setHours(0, 0, 0, 0);
+	weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)); // back to Monday
+
+	const setsOfWeek = await prisma.workoutExerciseSet.findMany({
+		where: {
+			skipped: false,
+			workoutExercise: { workout: { userId: owner.id, startedAt: { gte: weekStart } } }
+		},
+		select: {
+			reps: true,
+			load: true,
+			workoutExercise: { select: { targetMuscleGroup: true, customMuscleGroup: true } }
+		}
+	});
+
+	const byMuscle = new Map<string, { sets: number; tonnage: number }>();
+	for (const s of setsOfWeek) {
+		const key = s.workoutExercise.customMuscleGroup ?? s.workoutExercise.targetMuscleGroup;
+		const cur = byMuscle.get(key) ?? { sets: 0, tonnage: 0 };
+		cur.sets += 1;
+		cur.tonnage += s.reps * s.load;
+		byMuscle.set(key, cur);
+	}
+
+	const weeklyVolume = {
+		weekStart: weekStart.toISOString().slice(0, 10),
+		sets: setsOfWeek.length,
+		tonnage: Math.round(setsOfWeek.reduce((a, s) => a + s.reps * s.load, 0)),
+		byMuscle: [...byMuscle.entries()]
+			.map(([muscleGroup, v]) => ({ muscleGroup, sets: v.sets, tonnage: Math.round(v.tonnage) }))
+			.sort((a, b) => b.sets - a.sets)
+	};
+
 	const meso = await prisma.mesocycle.findFirst({
 		where: { userId: owner.id, startDate: { not: null }, endDate: null },
 		include: {
@@ -55,7 +98,14 @@ export const GET = async ({ url, request }) => {
 		}
 	});
 
-	if (!meso) return json({ active: false }, { headers: corsHeaders(origin) });
+	// No active block is not "no data" — weekly volume and the last session are
+	// still true and the calendar still wants them.
+	if (!meso) {
+		return json(
+			{ active: false, lastWorkoutAt: lastWorkout?.startedAt ?? null, weeklyVolume },
+			{ headers: corsHeaders(origin) }
+		);
+	}
 
 	// RIRProgression is indexed BY RIR value, and each element is how many weeks
 	// are spent at that RIR — so the block length is the sum, not the length, and
@@ -63,11 +113,6 @@ export const GET = async ({ url, request }) => {
 	const totalWeeks = arraySum(meso.RIRProgression);
 	const daysIn = Math.floor((Date.now() - meso.startDate!.getTime()) / 86_400_000);
 	const weekNumber = Math.min(Math.floor(daysIn / 7) + 1, totalWeeks);
-	const lastWorkout = await prisma.workout.findFirst({
-		where: { userId: owner.id },
-		orderBy: { startedAt: 'desc' },
-		select: { startedAt: true }
-	});
 
 	return json(
 		{
@@ -79,7 +124,8 @@ export const GET = async ({ url, request }) => {
 			currentRIR: getRIRForWeek(meso.RIRProgression, weekNumber),
 			workoutsLogged: meso._count.workoutsOfMesocycle,
 			trainingDaysPerWeek: meso.mesocycleExerciseSplitDays.filter((d) => !d.isRestDay).length,
-			lastWorkoutAt: lastWorkout?.startedAt ?? null
+			lastWorkoutAt: lastWorkout?.startedAt ?? null,
+			weeklyVolume
 		},
 		{ headers: corsHeaders(origin) }
 	);

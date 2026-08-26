@@ -1,3 +1,29 @@
+-- RETIRED 26 Aug 2026 — these views are NOT deployed. Kept as the recipe.
+--
+-- Why they went: they existed so a separate health-ops service could read
+-- Dead Lifts data without touching myfit tables. That service was never built
+-- and isn't planned. After ~2.5 months they had zero consumers anywhere in the
+-- estate — grepping for all three names found only this file.
+--
+-- Three specific reasons not to keep them on standby:
+--   1. current_mesocycle is now redundant. /api/meso-state answers exactly the
+--      same question, and does it correctly — the view carried the same
+--      cardinality("RIRProgression") bug for its whole life precisely BECAUSE
+--      nothing read it. An unread view is an unverified one.
+--   2. The obvious consumer can't reach them. The Cotsworth calendar talks to a
+--      different Supabase project (nuuschplwcljkfboaxfo), not cos-rag, so it was
+--      never going to query these regardless.
+--   3. Prisma migrations don't know cross-schema views exist, so they rot
+--      silently when the app's schema moves under them.
+--
+-- What replaced them: /api/meso-state now serves weekly volume (total sets,
+-- tonnage, and a per-muscle breakdown) alongside the mesocycle state, over the
+-- token-gated endpoint the calendar already consumes. Same data, a consumer
+-- that actually exists.
+--
+-- To bring them back: run this file through the SESSION pooler (5432).
+--   ~/Systems/01-HUB/ai-cos-rag/dbq.sh "$(cat sql/health_views.sql)"
+
 -- Cross-schema read views for health-ops over Dead Lifts (myfit schema) data.
 -- Owned by postgres; health-ops provisions into this same Supabase project and
 -- reads these instead of touching myfit tables directly.
