@@ -116,7 +116,7 @@
 	"dependencies": {
 		"@auth/prisma-adapter": "^2.4.1",
 		"@auth/sveltekit": "^1.7.0",
-		"@prisma/client": "6.0.0",
+		"@prisma/client": "6.19.3",
 		"@trpc/client": "^10.45.3",
 		"@trpc/server": "^10.45.3",
 		"chart.js": "^4.4.3",
