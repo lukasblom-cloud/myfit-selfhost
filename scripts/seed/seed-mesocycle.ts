@@ -138,7 +138,7 @@ await withPrisma(async (prisma) => {
 	console.log(`  RIRProgression  [${rirProgression}]  = ${totalWeeks} weeks`);
 	console.log(`  week-by-week    ${weekByWeek(rirProgression).join(' ')}`);
 	console.log(`  overload        ${overload}% / set / week`);
-	console.log(`  lastSetToFailure=true  forceRIRMatching=true  (app defaults)`);
+	console.log(`  lastSetToFailure=false  forceRIRMatching=true  (app defaults)`);
 	console.log('');
 	console.log('  START VOLUME (sets/cycle) vs CEILING — RP MEV -> MRV, per muscle:');
 	console.log(`     ${'MUSCLE'.padEnd(14)}${'START'.padEnd(8)}${'MAX'.padEnd(8)}+/wk`);
@@ -224,7 +224,9 @@ await withPrisma(async (prisma) => {
 		startDate: startImmediately ? new Date() : null,
 		endDate: null,
 		startOverloadPercentage: overload,
-		lastSetToFailure: true,
+		// Tracks defaultMesocycle in mesocycleRunes.svelte.ts, which flipped to
+		// false in 99db38c2. Keep the two in step.
+		lastSetToFailure: false,
 		forceRIRMatching: true
 	};
 
